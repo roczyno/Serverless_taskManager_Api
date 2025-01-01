@@ -22,8 +22,8 @@ public class LoginUserHandler implements RequestHandler<APIGatewayProxyRequestEv
 
 	public LoginUserHandler(){
 		this.cognitoUserService=new CognitoUserService(System.getenv("AWS_REGION"));
-		this.appClientId=Utils.decrypt("TM_COGNITO_POOL_CLIENT_ID");
-		this.appClientSecret=Utils.decrypt("TM_COGNITO_POOL_SECRET_ID");
+		this.appClientId=System.getenv("TM_COGNITO_POOL_CLIENT_ID");
+		this.appClientSecret=System.getenv("TM_COGNITO_POOL_SECRET_ID");
 	}
 	@Override
 	public APIGatewayProxyResponseEvent handleRequest(APIGatewayProxyRequestEvent input, Context context) {
@@ -37,11 +37,12 @@ public class LoginUserHandler implements RequestHandler<APIGatewayProxyRequestEv
 		try {
 			JsonObject loginRequest= JsonParser.parseString(input.getBody()).getAsJsonObject();
 			JsonObject loginResult=cognitoUserService.userLogin(loginRequest,appClientId,appClientSecret);
-			response.withBody(new Gson().toJson(loginRequest,JsonObject.class));
+			response.withBody(new Gson().toJson(loginResult,JsonObject.class));
 		}catch (AwsServiceException ex){
 			logger.log(ex.awsErrorDetails().errorMessage());
 			response.withStatusCode(500);
 			response.withBody(ex.awsErrorDetails().errorMessage());
+			response.withStatusCode(200);
 
 		}catch (Exception ex){
 			logger.log(ex.getMessage());

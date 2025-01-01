@@ -14,8 +14,8 @@ Globals:
     MemorySize: 512
     Environment:
       Variables:
-        TM_COGNITO_POOL_CLIENT_ID: AQICAHgbhXll4CWwgT+//w4RVovXVE1ulXmkmo4wc+ALf3yVQgGIJHuy1zzxtjIhekEBb1pCAAAAeTB3BgkqhkiG9w0BBwagajBoAgEAMGMGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMyVnywTQcYkj6uTBkAgEQgDZXOovDtCOc7UhFiAUYuBAVHQQVQMXCOJ3YujWogrYGE0mUJjMIjA6109QrSd66vPW2vY/ADjw="
-        TM_COGNITO_POOL_SECRET_ID: AQICAHgbhXll4CWwgT+//w4RVovXVE1ulXmkmo4wc+ALf3yVQgFtOFrHs0W0mzAWJNxox6uJAAAAlTCBkgYJKoZIhvcNAQcGoIGEMIGBAgEAMHwGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMG01TAweUoigCcJyfAgEQgE+iSMThvthmNh57dgq8B7rPq2G9tVtugxbIgaDaLl2G9VA8PG0jIL7fo5d2Q2/WitdkqdcrkjzpnqfMgem4vZkVb39AwJsy+jeDGjCkSjM6
+        TM_COGNITO_POOL_CLIENT_ID: 2hac15m5nrvsq4anq49mitpker
+        TM_COGNITO_POOL_SECRET_ID: 2gvqhs28u14pbm08ar1d8h0f6hp6blp4rkaehu8p6ehfvme53cm
 Resources:
   CreateUserHandlerFunction:
     Type: AWS::Serverless::Function
@@ -36,13 +36,26 @@ Resources:
       CodeUri: ConfirmUserHandlerFunction
       Handler: com.roczyno.aws.task_manager.ConfirmUserHandler::handleRequest
       Events:
-        CreateUser:
+        ConfirmUser:
           Type: Api
           Properties:
             Path: /confirm
             Method: post
     Metadata:
       SamResourceId: ConfirmUserHandlerFunction
+  LoginUserHandlerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: LoginUserHandlerFunction
+      Handler: com.roczyno.aws.task_manager.LoginUserHandler::handleRequest
+      Events:
+        LoginUser:
+          Type: Api
+          Properties:
+            Path: /login
+            Method: post
+    Metadata:
+      SamResourceId: LoginUserHandlerFunction
 Outputs:
   CreateUserApi:
     Description: API Gateway endpoint URL for Prod stage for CreateUserHandler Function

@@ -19,3 +19,6 @@ t
 DTaskManagerApi/src/main/java/com/roczyno/aws/task_manager/Utils.java,7\1\71b6e0a174cec64c6c1d08ffdb5c1da6989ce7fa
 
 OTaskManagerApi/src/main/java/com/roczyno/aws/task_manager/LoginUserHandler.java,c\0\c001ca92fdb344d4d05f9f15e9559d21c32481d4
+:
+
+.gitignore,a\5\a5cc2925ca8258af241be7e5b0381edf30266302
