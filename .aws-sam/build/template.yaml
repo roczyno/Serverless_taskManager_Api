@@ -1,0 +1,78 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'TaskManagerApi
+
+  Sample SAM Template for TaskManagerApi
+
+  '
+Globals:
+  Function:
+    Timeout: 20
+    Runtime: java17
+    Architectures:
+    - x86_64
+    MemorySize: 512
+    Environment:
+      Variables:
+        TM_COGNITO_POOL_CLIENT_ID: AQICAHgbhXll4CWwgT+//w4RVovXVE1ulXmkmo4wc+ALf3yVQgGIJHuy1zzxtjIhekEBb1pCAAAAeTB3BgkqhkiG9w0BBwagajBoAgEAMGMGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMyVnywTQcYkj6uTBkAgEQgDZXOovDtCOc7UhFiAUYuBAVHQQVQMXCOJ3YujWogrYGE0mUJjMIjA6109QrSd66vPW2vY/ADjw="
+        TM_COGNITO_POOL_SECRET_ID: AQICAHgbhXll4CWwgT+//w4RVovXVE1ulXmkmo4wc+ALf3yVQgFtOFrHs0W0mzAWJNxox6uJAAAAlTCBkgYJKoZIhvcNAQcGoIGEMIGBAgEAMHwGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMG01TAweUoigCcJyfAgEQgE+iSMThvthmNh57dgq8B7rPq2G9tVtugxbIgaDaLl2G9VA8PG0jIL7fo5d2Q2/WitdkqdcrkjzpnqfMgem4vZkVb39AwJsy+jeDGjCkSjM6
+Resources:
+  CreateUserHandlerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: CreateUserHandlerFunction
+      Handler: com.roczyno.aws.task_manager.CreateUserHandler::handleRequest
+      Events:
+        ConfirmUser:
+          Type: Api
+          Properties:
+            Path: /users
+            Method: post
+    Metadata:
+      SamResourceId: CreateUserHandlerFunction
+  ConfirmUserHandlerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ConfirmUserHandlerFunction
+      Handler: com.roczyno.aws.task_manager.ConfirmUserHandler::handleRequest
+      Events:
+        CreateUser:
+          Type: Api
+          Properties:
+            Path: /confirm
+            Method: post
+    Metadata:
+      SamResourceId: ConfirmUserHandlerFunction
+Outputs:
+  CreateUserApi:
+    Description: API Gateway endpoint URL for Prod stage for CreateUserHandler Function
+    Value:
+      Fn::Sub: https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/users/
+  CreateUserHandlerFunction:
+    Description: CreateUserHandler Lambda Function ARN
+    Value:
+      Fn::GetAtt:
+      - CreateUserHandlerFunction
+      - Arn
+  CreateUserHandlerFunctionIamRole:
+    Description: Implicit IAM Role created for CreateUserHandler
+    Value:
+      Fn::GetAtt:
+      - CreateUserHandlerFunctionRole
+      - Arn
+  ConfirmUserApi:
+    Description: API Gateway endpoint URL for Prod stage for ConfirmUserHandler Function
+    Value:
+      Fn::Sub: https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/confirm/
+  ConfirmUserHandlerFunction:
+    Description: ConfirmUserHandler Lambda Function ARN
+    Value:
+      Fn::GetAtt:
+      - ConfirmUserHandlerFunction
+      - Arn
+  ConfirmUserHandlerFunctionIamRole:
+    Description: Implicit IAM Role created for ConfirmUserHandler
+    Value:
+      Fn::GetAtt:
+      - ConfirmUserHandlerFunctionRole
+      - Arn
