@@ -22,3 +22,7 @@ OTaskManagerApi/src/main/java/com/roczyno/aws/task_manager/LoginUserHandler.java
 :
 
 .gitignore,a\5\a5cc2925ca8258af241be7e5b0381edf30266302
+|
+LTaskManagerApi/src/main/java/com/roczyno/aws/task_manager/ErrorResponse.java,0\3\03eac4c57ded2d7ade043357e2251dad3e583c39
+„
+TTaskManagerApi/src/main/java/com/roczyno/aws/task_manager/AddUserToGroupHandler.java,9\8\98e68f0387da2015b7ecd06189f32bf71c7e3bad

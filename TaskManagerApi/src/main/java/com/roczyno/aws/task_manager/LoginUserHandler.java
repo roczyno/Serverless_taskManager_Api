@@ -6,6 +6,7 @@ import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyRequestEvent;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent;
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.roczyno.aws.task_manager.service.CognitoUserService;
@@ -40,13 +41,16 @@ public class LoginUserHandler implements RequestHandler<APIGatewayProxyRequestEv
 			response.withBody(new Gson().toJson(loginResult,JsonObject.class));
 		}catch (AwsServiceException ex){
 			logger.log(ex.awsErrorDetails().errorMessage());
+			ErrorResponse errorResponse= new ErrorResponse(ex.awsErrorDetails().errorMessage());
+			String errorResponseJsonString=new GsonBuilder().serializeNulls().create().toJson(errorResponse,ErrorResponse.class);
+			response.withBody(errorResponseJsonString);
 			response.withStatusCode(500);
-			response.withBody(ex.awsErrorDetails().errorMessage());
-			response.withStatusCode(200);
 
 		}catch (Exception ex){
 			logger.log(ex.getMessage());
-			response.withBody(ex.getMessage());
+			ErrorResponse errorResponse= new ErrorResponse(ex.getMessage());
+			String errorResponseJsonString=new GsonBuilder().serializeNulls().create().toJson(errorResponse,ErrorResponse.class);
+			response.withBody(errorResponseJsonString);
 			response.withStatusCode(500);
 		}
 

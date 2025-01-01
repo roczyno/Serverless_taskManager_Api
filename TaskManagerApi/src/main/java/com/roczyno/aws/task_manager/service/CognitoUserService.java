@@ -5,6 +5,8 @@ import netscape.javascript.JSObject;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.cognitoidentity.model.CognitoIdentityProvider;
 import software.amazon.awssdk.services.cognitoidentityprovider.CognitoIdentityProviderClient;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.AdminAddUserToGroupRequest;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.AdminAddUserToGroupResponse;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.AttributeType;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.AuthFlowType;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.AuthenticationResultType;
@@ -143,5 +145,19 @@ public class CognitoUserService {
 	loginUserResponse.addProperty("refreshToken",authenticationResultType.refreshToken());
 
 	return loginUserResponse;
+	}
+
+	public JsonObject addUserToGroup(String groupName,String userName,String userPoolId){
+	AdminAddUserToGroupRequest adminAddUserToGroupRequest=AdminAddUserToGroupRequest.builder()
+				.groupName(groupName)
+				.username(userName)
+				.userPoolId(userPoolId)
+				.build();
+	AdminAddUserToGroupResponse adminAddUserToGroupResponse= cognitoIdentityProviderClient.adminAddUserToGroup(adminAddUserToGroupRequest);
+		JsonObject addUserToGroupResponse=new JsonObject();
+		addUserToGroupResponse.addProperty("isSuccessful",adminAddUserToGroupResponse.sdkHttpResponse().isSuccessful());
+		addUserToGroupResponse.addProperty("statusCode",adminAddUserToGroupResponse.sdkHttpResponse().statusCode());
+
+		return addUserToGroupResponse;
 	}
 }

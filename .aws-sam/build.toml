@@ -5,9 +5,9 @@ codeuri = "/mnt/c/Users/JacobSabbathAdiaba/OneDrive - AmaliTech gGmbH/Desktop/Aw
 runtime = "java17"
 architecture = "x86_64"
 handler = "com.roczyno.aws.task_manager.CreateUserHandler::handleRequest"
-source_hash = "401da21be840ca868388335677493802ac41e7f0d6e2161d8da6da1b1d79a6f0"
+source_hash = "ccf15ff26920f3fa9f4ac9df09d1165e418dc2d15ed7ae8d4713e0c3145ee7b5"
 manifest_hash = ""
 packagetype = "Zip"
-functions = ["CreateUserHandlerFunction", "ConfirmUserHandlerFunction", "LoginUserHandlerFunction"]
+functions = ["CreateUserHandlerFunction", "ConfirmUserHandlerFunction", "LoginUserHandlerFunction", "AddUserToGroupHandlerFunction"]
 
 [layer_build_definitions]

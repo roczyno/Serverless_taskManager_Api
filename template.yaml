@@ -16,6 +16,7 @@ Globals:
       Variables:
         TM_COGNITO_POOL_CLIENT_ID: 2hac15m5nrvsq4anq49mitpker
         TM_COGNITO_POOL_SECRET_ID: 2gvqhs28u14pbm08ar1d8h0f6hp6blp4rkaehu8p6ehfvme53cm
+        TM_COGNITO-USER_POOL_ID: eu-west-1_HFpwlSV34
 
 Resources:
   CreateUserHandlerFunction:
@@ -52,6 +53,26 @@ Resources:
           Type: Api
           Properties:
             Path: /login
+            Method: post
+
+  AddUserToGroupHandlerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: TaskManagerApi
+      Handler: com.roczyno.aws.task_manager.AddUserToGroupHandler::handleRequest
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: allow
+              Action:
+                - 'cognito-idp:AdminAddUserToGroup'
+              Resource: "arn:aws:cognito-idp:eu-west-1:897729111286:userpool/eu-west-1_HFpwlSV34"
+
+      Events:
+        AddUserToGroup:
+          Type: Api
+          Properties:
+            Path: /users/{username}/add-to-group
             Method: post
 
 Outputs:
