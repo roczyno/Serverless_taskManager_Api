@@ -20,7 +20,7 @@ public class AddUserToGroupHandler implements RequestHandler<APIGatewayProxyRequ
 	private final String userPoolId;
 	public AddUserToGroupHandler(){
 		this.cognitoUserService=new CognitoUserService(System.getenv("AWS_REGION"));
-		this.userPoolId=System.getenv("TM_COGNITO-USER_POOL_ID");
+		this.userPoolId=System.getenv("TM_COGNITO_USER_POOL_ID");
 
 	}
 	@Override

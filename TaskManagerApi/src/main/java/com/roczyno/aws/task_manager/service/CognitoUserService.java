@@ -1,19 +1,24 @@
 package com.roczyno.aws.task_manager.service;
 
 import com.google.gson.JsonObject;
-import netscape.javascript.JSObject;
+import com.roczyno.aws.task_manager.model.User;
 import software.amazon.awssdk.regions.Region;
-import software.amazon.awssdk.services.cognitoidentity.model.CognitoIdentityProvider;
 import software.amazon.awssdk.services.cognitoidentityprovider.CognitoIdentityProviderClient;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.AdminAddUserToGroupRequest;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.AdminAddUserToGroupResponse;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.AdminCreateUserRequest;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.AdminCreateUserResponse;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.AttributeType;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.AuthFlowType;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.AuthenticationResultType;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.ConfirmSignUpRequest;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.ConfirmSignUpResponse;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.DeliveryMediumType;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.GetUserRequest;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.GetUserResponse;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.InitiateAuthRequest;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.InitiateAuthResponse;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.MessageActionType;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.SignUpRequest;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.SignUpResponse;
 
@@ -159,5 +164,75 @@ public class CognitoUserService {
 		addUserToGroupResponse.addProperty("statusCode",adminAddUserToGroupResponse.sdkHttpResponse().statusCode());
 
 		return addUserToGroupResponse;
+	}
+
+	public JsonObject getUser(String accessToken){
+		GetUserRequest getUserRequest=GetUserRequest.builder()
+				.accessToken(accessToken)
+				.build();
+		GetUserResponse getUserResponse= cognitoIdentityProviderClient.getUser(getUserRequest);
+		JsonObject getUserResult=new JsonObject();
+		getUserResult.addProperty("isSuccessful",getUserResponse.sdkHttpResponse().isSuccessful());
+		getUserResult.addProperty("statusCode",getUserResponse.sdkHttpResponse().statusCode());
+		List<AttributeType> userAttributes= getUserResponse.userAttributes();
+		JsonObject userDetails=new JsonObject();
+		userAttributes.stream().forEach((u)->{
+			userDetails.addProperty(u.name(),u.value());
+		});
+		getUserResult.add("user",userDetails);
+		return getUserResult;
+	}
+
+	public JsonObject adminAddUser(JsonObject user,String userPoolId){
+
+		String email=user.get("email").getAsString();
+		String password=generateTempPassword();
+		String role=user.get("role").getAsString();
+		String firstName=user.get("firstName").getAsString();
+		String lastName=user.get("lastName").getAsString();
+
+		String userId= UUID.randomUUID().toString();
+
+		AttributeType attributeUserId=AttributeType.builder()
+				.name("custom:userId")
+				.value(userId)
+				.build();
+		AttributeType emailAttribute=AttributeType.builder()
+				.name("email")
+				.value(email)
+				.build();
+		AttributeType nameAttribute=AttributeType.builder()
+				.name("name")
+				.value(firstName+" "+lastName)
+				.build();
+		AttributeType attributeUserRole=AttributeType.builder()
+				.name("custom:role")
+				.value(role)
+				.build();
+
+		List<AttributeType> attributes=new ArrayList<>();
+		attributes.add(nameAttribute);
+		attributes.add(emailAttribute);
+		attributes.add(attributeUserId);
+		attributes.add(attributeUserRole);
+
+		AdminCreateUserRequest adminCreateUserRequest=AdminCreateUserRequest.builder()
+				.userPoolId(userPoolId)
+				.username(email)
+				.desiredDeliveryMediums(DeliveryMediumType.EMAIL)
+				.userAttributes(attributes)
+				.messageAction(MessageActionType.SUPPRESS)
+				.build();
+
+		AdminCreateUserResponse adminCreateUserResponse=cognitoIdentityProviderClient.adminCreateUser(adminCreateUserRequest);
+		JsonObject addUserResponse=new JsonObject();
+		addUserResponse.addProperty("isSuccessful",adminCreateUserResponse.sdkHttpResponse().isSuccessful());
+		addUserResponse.addProperty("statusCode",adminCreateUserResponse.sdkHttpResponse().statusCode());
+		return addUserResponse;
+	}
+
+
+	private String generateTempPassword() {
+		return UUID.randomUUID().toString().substring(0, 8) + "Aa1!";
 	}
 }

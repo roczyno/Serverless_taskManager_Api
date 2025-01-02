@@ -4,10 +4,10 @@
 codeuri = "/mnt/c/Users/JacobSabbathAdiaba/OneDrive - AmaliTech gGmbH/Desktop/Aws Microservice/projects/TaskManagerApi/TaskManagerApi"
 runtime = "java17"
 architecture = "x86_64"
-handler = "com.roczyno.aws.task_manager.CreateUserHandler::handleRequest"
-source_hash = "ccf15ff26920f3fa9f4ac9df09d1165e418dc2d15ed7ae8d4713e0c3145ee7b5"
+handler = "com.roczyno.aws.task_manager.RegisterUserHandler::handleRequest"
+source_hash = "8c9d50eac53eaa873b2a0d10cf0559486c5dc8982e474f299b8a9cc62e919b76"
 manifest_hash = ""
 packagetype = "Zip"
-functions = ["CreateUserHandlerFunction", "ConfirmUserHandlerFunction", "LoginUserHandlerFunction", "AddUserToGroupHandlerFunction"]
+functions = ["RegisterUserHandlerFunction", "ConfirmUserHandlerFunction", "LoginUserHandlerFunction", "AddUserHandlerFunction", "GetUserHandlerFunction"]
 
 [layer_build_definitions]
