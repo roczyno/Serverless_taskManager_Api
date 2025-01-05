@@ -7,8 +7,6 @@ F
 TaskManagerApi/pom.xml,8\6\8653dbcb4fc0eea31165289cb9b3146a77b6a826
 v
 FTaskManagerApi/src/test/java/com/roczyno/aws/task_manager/AppTest.java,3\d\3d1ba486d07bc4fffefe0ed9e68df1d48f4f7586
-Ä
-PTaskManagerApi/src/main/java/com/roczyno/aws/task_manager/CreateUserHandler.java,6\d\6d769ce316edea8fef97807e6e72340efa1185ab
 â
 YTaskManagerApi/src/main/java/com/roczyno/aws/task_manager/service/CognitoUserService.java,1\7\1776926e0f3e6e0944d0f49e6a0072c0a0a85c0b
 =
@@ -42,3 +40,7 @@ RTaskManagerApi/src/main/java/com/roczyno/aws/task_manager/RegisterUserHandler.j
 MTaskManagerApi/src/main/java/com/roczyno/aws/task_manager/AddUserHandler.java,b\5\b57de8ba6ec6d8285585a8b569b04b251ec55cae
 y
 ITaskManagerApi/src/main/java/com/roczyno/aws/task_manager/model/User.java,a\a\aa3e59cde3e321dfc0c6e46e9f2b15ec53ff4629
+í
+bTaskManagerApi/src/main/java/com/roczyno/aws/task_manager/authorizer/AwsCognitoRSAKeyProvider.java,d\0\d03b1ad443d3e61b8036d0eff3a65fe3f91f9d64
+Å
+QTaskManagerApi/src/main/java/com/roczyno/aws/task_manager/authorizer/JwtUtil.java,5\4\54c4f9457b0b1a0a957e3b5b78edf8038c9e88fa

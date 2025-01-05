@@ -18,6 +18,26 @@ Globals:
         TM_COGNITO_POOL_SECRET_ID: 2gvqhs28u14pbm08ar1d8h0f6hp6blp4rkaehu8p6ehfvme53cm
         TM_COGNITO_USER_POOL_ID: eu-west-1_HFpwlSV34
 Resources:
+  MyApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: Prod
+      Auth:
+        DefaultAuthorizer: TaskManagerLambdaAuthorizer
+        Authorizers:
+          TaskManagerLambdaAuthorizer:
+            FunctionArn:
+              Fn::GetAtt:
+              - LambdaAuthorizerFunction
+              - Arn
+            FunctionInvokeRole:
+              Fn::GetAtt:
+              - LambdaAuthorizerRole
+              - Arn
+            Identity:
+              Header: Authorization
+              ValidationExpression: Bearer.*
+              ReauthorizeEvery: 300
   RegisterUserHandlerFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -29,6 +49,8 @@ Resources:
           Properties:
             Path: /register
             Method: post
+            RestApiId:
+              Ref: MyApi
     Metadata:
       SamResourceId: RegisterUserHandlerFunction
   ConfirmUserHandlerFunction:
@@ -42,6 +64,8 @@ Resources:
           Properties:
             Path: /confirm
             Method: post
+            RestApiId:
+              Ref: MyApi
     Metadata:
       SamResourceId: ConfirmUserHandlerFunction
   LoginUserHandlerFunction:
@@ -55,6 +79,8 @@ Resources:
           Properties:
             Path: /login
             Method: post
+            RestApiId:
+              Ref: MyApi
     Metadata:
       SamResourceId: LoginUserHandlerFunction
   AddUserHandlerFunction:
@@ -75,6 +101,10 @@ Resources:
           Properties:
             Path: /users
             Method: post
+            RestApiId:
+              Ref: MyApi
+            Auth:
+              Authorizer: TaskManagerLambdaAuthorizer
     Metadata:
       SamResourceId: AddUserHandlerFunction
   GetUserHandlerFunction:
@@ -88,13 +118,50 @@ Resources:
           Properties:
             Path: /user/me
             Method: get
+            RestApiId:
+              Ref: MyApi
     Metadata:
       SamResourceId: GetUserHandlerFunction
+  LambdaAuthorizerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: LambdaAuthorizerFunction
+      Handler: com.roczyno.aws.task_manager.authorizer.LambdaAuthorizer::handleRequest
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - cognito-idp:GetUser
+          Resource: arn:aws:cognito-idp:eu-west-1:897729111286:userpool/eu-west-1_HFpwlSV34
+    Metadata:
+      SamResourceId: LambdaAuthorizerFunction
+  LambdaAuthorizerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: apigateway.amazonaws.com
+          Action: sts:AssumeRole
+      Policies:
+      - PolicyName: InvokeLambdaAuthorizer
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action: lambda:InvokeFunction
+            Resource:
+              Fn::GetAtt:
+              - LambdaAuthorizerFunction
+              - Arn
 Outputs:
   CreateUserApi:
     Description: API Gateway endpoint URL for Prod stage for CreateUserHandler Function
     Value:
-      Fn::Sub: https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/users/
+      Fn::Sub: https://${MyApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/users/
   RegisterUserHandlerFunction:
     Description: RegisterUserHandler Lambda Function ARN
     Value:
@@ -110,7 +177,7 @@ Outputs:
   ConfirmUserApi:
     Description: API Gateway endpoint URL for Prod stage for ConfirmUserHandler Function
     Value:
-      Fn::Sub: https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/confirm/
+      Fn::Sub: https://${MyApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/confirm/
   ConfirmUserHandlerFunction:
     Description: ConfirmUserHandler Lambda Function ARN
     Value:

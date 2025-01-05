@@ -221,6 +221,7 @@ public class CognitoUserService {
 				.username(email)
 				.desiredDeliveryMediums(DeliveryMediumType.EMAIL)
 				.userAttributes(attributes)
+				.temporaryPassword(password)
 				.messageAction(MessageActionType.SUPPRESS)
 				.build();
 
