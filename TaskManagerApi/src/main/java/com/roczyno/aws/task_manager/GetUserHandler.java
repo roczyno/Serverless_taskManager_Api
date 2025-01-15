@@ -5,29 +5,46 @@ import com.amazonaws.services.lambda.runtime.LambdaLogger;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyRequestEvent;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
+import com.roczyno.aws.task_manager.config.AwsConfig;
 import com.roczyno.aws.task_manager.service.CognitoUserService;
+import com.roczyno.aws.task_manager.service.NotificationService;
 import software.amazon.awssdk.awscore.exception.AwsServiceException;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.ses.SesClient;
 
 import java.util.HashMap;
 import java.util.Map;
 
 public class GetUserHandler implements RequestHandler<APIGatewayProxyRequestEvent, APIGatewayProxyResponseEvent> {
 	private final CognitoUserService cognitoUserService;
+	private static final Map<String, String> CORS_HEADERS = Map.of(
+			"Content-Type", "application/json",
+			"Access-Control-Allow-Origin", "*",
+			"Access-Control-Allow-Methods", "GET",
+			"Access-Control-Allow-Headers", "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token"
+	);
 
 	public GetUserHandler(){
-		this.cognitoUserService=new CognitoUserService(System.getenv("AWS_REGION"));
+		NotificationService notificationService = new NotificationService(
+				AwsConfig.sesClient(),
+				AwsConfig.sqsClient(),
+				AwsConfig.objectMapper(),
+				AwsConfig.snsClient()
+
+		);
+		this.cognitoUserService=new CognitoUserService(System.getenv("AWS_REGION"),notificationService);
 
 	}
 	@Override
 	public APIGatewayProxyResponseEvent handleRequest(APIGatewayProxyRequestEvent input, Context context) {
-		Map<String,String> headers= new HashMap<>();
-		headers.put("Content-Type","application/json");
+
 
 		APIGatewayProxyResponseEvent response= new APIGatewayProxyResponseEvent()
-				.withHeaders(headers);
+				.withHeaders(CORS_HEADERS);
 
 		LambdaLogger logger= context.getLogger();
 		try {

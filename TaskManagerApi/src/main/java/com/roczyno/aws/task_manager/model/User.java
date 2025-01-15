@@ -1,17 +1,13 @@
 package com.roczyno.aws.task_manager.model;
 
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.Data;
 
-@AllArgsConstructor
-@NoArgsConstructor
-@Getter
-@Setter
+@Data
 public class User {
-	private String username;
+	private String id;
+	private String firstName;
+	private String lastName;
 	private String email;
-	private String role;
-	private boolean enabled;
+	private Role role;
+
 }

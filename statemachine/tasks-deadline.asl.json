@@ -1,0 +1,48 @@
+{
+  "Comment": "Task Expiration Workflow",
+  "StartAt": "UpdateTaskStatus",
+  "States": {
+    "UpdateTaskStatus": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::dynamodb:updateItem",
+      "Parameters": {
+        "TableName": "${TasksTable}",
+        "Key": {
+          "id": {
+            "S.$": "$.taskId"
+          }
+        },
+        "UpdateExpression": "SET #status = :expiredStatus",
+        "ExpressionAttributeNames": {
+          "#status": "status"
+        },
+        "ExpressionAttributeValues": {
+          ":expiredStatus": {
+            "S": "EXPIRED"
+          }
+        }
+      },
+      "Next": "SendNotification"
+    },
+    "SendNotification": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish",
+      "Parameters": {
+        "TopicArn": "${ClosedTasksNotificationTopic}",
+        "Message": {
+          "Fn::Join": [
+            "",
+            [
+              "Task has expired:\n",
+              "Task Name: ", {"Ref": "taskName"}, "\n",
+              "Deadline: ", {"Ref": "deadline"}, "\n",
+              "Assigned User: ", {"Ref": "assignedUserId"}, "\n",
+              "\nThis notification has been sent to both the assigned user and administrators."
+            ]
+          ]
+        }
+      },
+      "End": true
+    }
+  }
+}

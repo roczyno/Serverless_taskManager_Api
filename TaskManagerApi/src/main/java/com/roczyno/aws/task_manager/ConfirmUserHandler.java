@@ -8,8 +8,12 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.roczyno.aws.task_manager.config.AwsConfig;
 import com.roczyno.aws.task_manager.service.CognitoUserService;
+import com.roczyno.aws.task_manager.service.NotificationService;
 import software.amazon.awssdk.awscore.exception.AwsServiceException;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.ses.SesClient;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -18,19 +22,31 @@ public class ConfirmUserHandler implements RequestHandler<APIGatewayProxyRequest
 	private final CognitoUserService cognitoUserService;
 	private final String appClientId;
 	private final String appClientSecret;
+	private static final Map<String, String> CORS_HEADERS = Map.of(
+			"Content-Type", "application/json",
+			"Access-Control-Allow-Origin", "*",
+			"Access-Control-Allow-Methods", "POST",
+			"Access-Control-Allow-Headers", "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token"
+	);
 
 	public ConfirmUserHandler(){
-		this.cognitoUserService=new CognitoUserService(System.getenv("AWS_REGION"));
+		NotificationService notificationService = new NotificationService(
+				AwsConfig.sesClient(),
+				AwsConfig.sqsClient(),
+				AwsConfig.objectMapper(),
+				AwsConfig.snsClient()
+
+		);
+		this.cognitoUserService=new CognitoUserService(System.getenv("AWS_REGION"),notificationService);
 		this.appClientId=System.getenv("TM_COGNITO_POOL_CLIENT_ID");
 		this.appClientSecret=System.getenv("TM_COGNITO_POOL_SECRET_ID");
 	}
 	@Override
 	public APIGatewayProxyResponseEvent handleRequest(APIGatewayProxyRequestEvent input, Context context) {
-		Map<String,String> headers= new HashMap<>();
-		headers.put("Content-Type","application/json");
+
 
 		APIGatewayProxyResponseEvent response= new APIGatewayProxyResponseEvent()
-				.withHeaders(headers);
+				.withHeaders(CORS_HEADERS);
 
 		LambdaLogger logger= context.getLogger();
 

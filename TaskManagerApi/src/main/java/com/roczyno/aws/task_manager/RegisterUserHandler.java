@@ -8,8 +8,12 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.roczyno.aws.task_manager.config.AwsConfig;
 import com.roczyno.aws.task_manager.service.CognitoUserService;
+import com.roczyno.aws.task_manager.service.NotificationService;
 import software.amazon.awssdk.awscore.exception.AwsServiceException;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.ses.SesClient;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -20,7 +24,14 @@ public class RegisterUserHandler implements RequestHandler<APIGatewayProxyReques
 	private final String appClientId;
 	private final String appClientSecret;
 	public RegisterUserHandler(){
-		this.cognitoUserService=new CognitoUserService(System.getenv("AWS_REGION"));
+		NotificationService notificationService = new NotificationService(
+				AwsConfig.sesClient(),
+				AwsConfig.sqsClient(),
+				AwsConfig.objectMapper(),
+				AwsConfig.snsClient()
+
+		);
+		this.cognitoUserService=new CognitoUserService(System.getenv("AWS_REGION"),notificationService);
 		this.appClientId=System.getenv("TM_COGNITO_POOL_CLIENT_ID");
 		this.appClientSecret=System.getenv("TM_COGNITO_POOL_SECRET_ID");
 	}

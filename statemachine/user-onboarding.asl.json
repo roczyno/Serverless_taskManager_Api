@@ -1,0 +1,167 @@
+{
+  "Comment": "User onboarding workflow for role-based SNS topic subscriptions",
+  "StartAt": "DetermineUserSubscriptions",
+  "States": {
+    "DetermineUserSubscriptions": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.role",
+          "StringEquals": "ADMIN",
+          "Next": "AdminSubscriptions"
+        }
+      ],
+      "Default": "RegularUserSubscriptions"
+    },
+    "AdminSubscriptions": {
+      "Type": "Parallel",
+      "ResultPath": "$.subscriptionResults",
+      "Branches": [
+        {
+          "StartAt": "Admin Subscribe to Closed Tasks",
+          "States": {
+            "Admin Subscribe to Closed Tasks": {
+              "Type": "Task",
+              "Resource": "${SNSSubscriptionFunctionArn}",
+              "Parameters": {
+                "email.$": "$.email",
+                "topicArn.$": "$.closedTopicArn",
+                "userId.$": "$.userId",
+                "role.$": "$.role"
+              },
+              "ResultPath": "$.closedSubscription",
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "Admin Subscribe to Task Complete",
+          "States": {
+            "Admin Subscribe to Task Complete": {
+              "Type": "Task",
+              "Resource": "${SNSSubscriptionFunctionArn}",
+              "Parameters": {
+                "email.$": "$.email",
+                "topicArn.$": "$.completeTopicArn",
+                "userId.$": "$.userId",
+                "role.$": "$.role"
+              },
+              "ResultPath": "$.completeSubscription",
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "Admin Subscribe to Assignment",
+          "States": {
+            "Admin Subscribe to Assignment": {
+              "Type": "Task",
+              "Resource": "${SNSSubscriptionFunctionArn}",
+              "Parameters": {
+                "email.$": "$.email",
+                "topicArn.$": "$.assignmentTopicArn",
+                "userId.$": "$.userId",
+                "role.$": "$.role"
+              },
+              "ResultPath": "$.assignmentSubscription",
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "Admin Subscribe to Deadline",
+          "States": {
+            "Admin Subscribe to Deadline": {
+              "Type": "Task",
+              "Resource": "${SNSSubscriptionFunctionArn}",
+              "Parameters": {
+                "email.$": "$.email",
+                "topicArn.$": "$.deadlineTopicArn",
+                "userId.$": "$.userId",
+                "role.$": "$.role"
+              },
+              "ResultPath": "$.deadlineSubscription",
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "Admin Subscribe to Reopened Tasks",
+          "States": {
+            "Admin Subscribe to Reopened Tasks": {
+              "Type": "Task",
+              "Resource": "${SNSSubscriptionFunctionArn}",
+              "Parameters": {
+                "email.$": "$.email",
+                "topicArn.$": "$.reopenedTopicArn",
+                "userId.$": "$.userId",
+                "role.$": "$.role"
+              },
+              "ResultPath": "$.reopenedSubscription",
+              "End": true
+            }
+          }
+        }
+      ],
+      "End": true
+    },
+    "RegularUserSubscriptions": {
+      "Type": "Parallel",
+      "ResultPath": "$.regularSubscriptionResults",
+      "Branches": [
+        {
+          "StartAt": "Regular Subscribe to Assignment",
+          "States": {
+            "Regular Subscribe to Assignment": {
+              "Type": "Task",
+              "Resource": "${SNSSubscriptionFunctionArn}",
+              "Parameters": {
+                "email.$": "$.email",
+                "topicArn.$": "$.assignmentTopicArn",
+                "userId.$": "$.userId",
+                "role.$": "$.role"
+              },
+              "ResultPath": "$.assignmentSubscription",
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "Regular Subscribe to Deadline",
+          "States": {
+            "Regular Subscribe to Deadline": {
+              "Type": "Task",
+              "Resource": "${SNSSubscriptionFunctionArn}",
+              "Parameters": {
+                "email.$": "$.email",
+                "topicArn.$": "$.deadlineTopicArn",
+                "userId.$": "$.userId",
+                "role.$": "$.role"
+              },
+              "ResultPath": "$.deadlineSubscription",
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "Regular Subscribe to Reopened Tasks",
+          "States": {
+            "Regular Subscribe to Reopened Tasks": {
+              "Type": "Task",
+              "Resource": "${SNSSubscriptionFunctionArn}",
+              "Parameters": {
+                "email.$": "$.email",
+                "topicArn.$": "$.reopenedTopicArn",
+                "userId.$": "$.userId",
+                "role.$": "$.role"
+              },
+              "ResultPath": "$.reopenedSubscription",
+              "End": true
+            }
+          }
+        }
+      ],
+      "End": true
+    }
+  }
+}

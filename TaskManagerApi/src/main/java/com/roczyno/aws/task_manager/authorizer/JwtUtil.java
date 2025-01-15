@@ -16,9 +16,9 @@ public class JwtUtil {
 
 		Algorithm algorithm = Algorithm.RSA256(keyProvider);
 		JWTVerifier jwtVerifier = JWT.require(algorithm)
-				.withAudience(audience)
 				.withIssuer("https://cognito-idp." + region + ".amazonaws.com/" + userPoolId)
-				.withClaim("token_use", "id")
+				.withClaim("token_use", "access")  // Changed from 'id' to 'access'
+				// .withAudience(audience)  // Removed as access tokens use client_id
 				.build();
 
 		return jwtVerifier.verify(jwt);

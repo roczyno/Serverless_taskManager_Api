@@ -17,6 +17,12 @@ Globals:
         TM_COGNITO_POOL_CLIENT_ID: 2hac15m5nrvsq4anq49mitpker
         TM_COGNITO_POOL_SECRET_ID: 2gvqhs28u14pbm08ar1d8h0f6hp6blp4rkaehu8p6ehfvme53cm
         TM_COGNITO_USER_POOL_ID: eu-west-1_HFpwlSV34
+        ASSIGNMENT_TOPIC_ARN: !Ref TasksAssignmentNotificationTopic
+        DEADLINE_TOPIC_ARN: !Ref TasksDeadlineNotificationTopic
+        CLOSED_TOPIC_ARN: !Ref ClosedTasksNotificationTopic
+        REOPENED_TOPIC_ARN: !Ref ReopenedTasksNotificationTopic
+        COMPLETE_TOPIC_ARN: !Ref TaskCompleteNotificationTopic
+
 
 Resources:
   MyApi:
@@ -24,41 +30,16 @@ Resources:
     Properties:
       StageName: Prod
       Auth:
-        DefaultAuthorizer: TaskManagerLambdaAuthorizer
+        DefaultAuthorizer: CognitoAuthorizer
         Authorizers:
-          TaskManagerLambdaAuthorizer:
-            FunctionArn: !GetAtt LambdaAuthorizerFunction.Arn
-            FunctionInvokeRole: !GetAtt LambdaAuthorizerRole.Arn
-            Identity:
-              Header: Authorization
-              ValidationExpression: Bearer.*
-              ReauthorizeEvery: 300
+          CognitoAuthorizer:
+            UserPoolArn: !Sub "arn:aws:cognito-idp:eu-west-1:${AWS::AccountId}:userpool/eu-west-1_HFpwlSV34"
+      Cors:
+        AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
+        AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Requested-With'"  # Note the single quotes
+        AllowOrigin: "'http://localhost:5173'"
+        MaxAge: "'3600'"
 
-  RegisterUserHandlerFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: TaskManagerApi
-      Handler: com.roczyno.aws.task_manager.RegisterUserHandler::handleRequest
-      Events:
-        RegisterUser:
-          Type: Api
-          Properties:
-            Path: /register
-            Method: post
-            RestApiId: !Ref MyApi
-
-  ConfirmUserHandlerFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: TaskManagerApi
-      Handler: com.roczyno.aws.task_manager.ConfirmUserHandler::handleRequest
-      Events:
-        ConfirmUser:
-          Type: Api
-          Properties:
-            Path: /confirm
-            Method: post
-            RestApiId: !Ref MyApi
 
   LoginUserHandlerFunction:
     Type: AWS::Serverless::Function
@@ -72,19 +53,52 @@ Resources:
             Path: /login
             Method: post
             RestApiId: !Ref MyApi
+            Auth:
+              Authorizer: NONE
+
 
   AddUserHandlerFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: TaskManagerApi
       Handler: com.roczyno.aws.task_manager.AddUserHandler::handleRequest
+      Environment:
+        Variables:
+          TM_COGNITO_POOL_CLIENT_ID: 2hac15m5nrvsq4anq49mitpker
+          TM_COGNITO_POOL_SECRET_ID: 2gvqhs28u14pbm08ar1d8h0f6hp6blp4rkaehu8p6ehfvme53cm
+          TM_COGNITO_USER_POOL_ID: eu-west-1_HFpwlSV34
+          USER_ONBOARDING_STATE_MACHINE_ARN: !GetAtt UserOnboardingStateMachine.Arn
+          ASSIGNMENT_TOPIC_ARN: !Ref TasksAssignmentNotificationTopic
+          DEADLINE_TOPIC_ARN: !Ref TasksDeadlineNotificationTopic
+          CLOSED_TOPIC_ARN: !Ref ClosedTasksNotificationTopic
+          REOPENED_TOPIC_ARN: !Ref ReopenedTasksNotificationTopic
+          COMPLETE_TOPIC_ARN: !Ref TaskCompleteNotificationTopic
       Policies:
         - Version: "2012-10-17"
           Statement:
             - Effect: Allow
               Action:
                 - cognito-idp:AdminCreateUser
+                - cognito-idp:AdminAddUserToGroup
+                - cognito-idp:AdminSetUserPassword
+                - cognito-idp:UpdateUserPool  # Add this permission
               Resource: "arn:aws:cognito-idp:eu-west-1:897729111286:userpool/eu-west-1_HFpwlSV34"
+            - Effect: Allow
+              Action:
+                - ses:SendEmail
+                - ses:SendRawEmail
+              Resource: "*"
+            - Effect: Allow
+              Action:
+                - states:StartExecution
+              Resource: !GetAtt UserOnboardingStateMachine.Arn
+            - Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource:
+                - !Sub "arn:aws:logs:eu-west-1:${AWS::AccountId}:log-group:/aws/lambda/*"
       Events:
         AddUser:
           Type: Api
@@ -93,95 +107,562 @@ Resources:
             Method: post
             RestApiId: !Ref MyApi
             Auth:
-              Authorizer: TaskManagerLambdaAuthorizer
+              Authorizer: CognitoAuthorizer
 
 
-  #  AddUserToGroupHandlerFunction:
-#    Type: AWS::Serverless::Function
-#    Properties:
-#      CodeUri: TaskManagerApi
-#      Handler: com.roczyno.aws.task_manager.AddUserToGroupHandler::handleRequest
-#      Policies:
-#        - Version: "2012-10-17"
-#          Statement:
-#            - Effect: allow
-#              Action:
-#                - 'cognito-idp:AdminAddUserToGroup'
-#              Resource: "arn:aws:cognito-idp:eu-west-1:897729111286:userpool/eu-west-1_HFpwlSV34"
-#
-#      Events:
-#        AddUserToGroup:
-#          Type: Api
-#          Properties:
-#            Path: /users/{username}/add-to-group
-#            Method: post
 
-  GetUserHandlerFunction:
+  GetAllUsersHandlerFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: TaskManagerApi
-      Handler: com.roczyno.aws.task_manager.GetUserHandler::handleRequest
+      Handler: com.roczyno.aws.task_manager.GetAllUsersHandler::handleRequest
+      Environment:
+        Variables:
+          USER_POOL_ID: eu-west-1_HFpwlSV34
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - cognito-idp:ListUsers
+              Resource: "arn:aws:cognito-idp:eu-west-1:897729111286:userpool/eu-west-1_HFpwlSV34"
+            - Effect: Allow
+              Action:
+                - ses:SendEmail
+                - ses:SendRawEmail
+              Resource: "*"
+            - Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource:
+                - !Sub "arn:aws:logs:eu-west-1:${AWS::AccountId}:log-group:/aws/lambda/*"
       Events:
-        GetUser:
+        GetAllUsers:
           Type: Api
           Properties:
-            Path: /user/me
+            Path: /users
             Method: get
             RestApiId: !Ref MyApi
+            Auth:
+              Authorizer: CognitoAuthorizer
 
-  LambdaAuthorizerFunction:
+
+
+
+
+  # SNS Topics
+  TaskCompleteNotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: TaskCompleteNotificationTopic
+      DisplayName: Task Complete Notifications
+
+  TasksAssignmentNotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: TasksAssignmentNotificationTopic
+      DisplayName: Tasks Assignment Notifications
+
+  TasksDeadlineNotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: TasksDeadlineNotificationTopic
+      DisplayName: Tasks Deadline Notifications
+
+  ClosedTasksNotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: ClosedTasksNotificationTopic
+      DisplayName: Closed Tasks Notifications
+
+  ReopenedTasksNotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: ReopenedTasksNotificationTopic
+      DisplayName: Reopened Tasks Notifications
+
+  # Lambda Function for SNS Subscription
+  SNSSubscriptionFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: TaskManagerApi
-      Handler: com.roczyno.aws.task_manager.authorizer.LambdaAuthorizer::handleRequest
+      Handler: com.roczyno.aws.task_manager.SNSSubscriptionHandler::handleRequest
+      # Add logging permissions
       Policies:
         - Version: '2012-10-17'
           Statement:
             - Effect: Allow
               Action:
-                - cognito-idp:GetUser
-              Resource: "arn:aws:cognito-idp:eu-west-1:897729111286:userpool/eu-west-1_HFpwlSV34"
+                - sns:Subscribe
+                - sns:Unsubscribe
+                - sns:ListSubscriptionsByTopic
+              Resource:
+                - !Ref TasksAssignmentNotificationTopic
+                - !Ref TasksDeadlineNotificationTopic
+                - !Ref ClosedTasksNotificationTopic
+                - !Ref ReopenedTasksNotificationTopic
+                - !Ref TaskCompleteNotificationTopic
+            - Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource:
+                - !Sub "arn:aws:logs:eu-west-1:${AWS::AccountId}:log-group:/aws/lambda/*"
 
-  LambdaAuthorizerRole:
-    Type: AWS::IAM::Role
+  # Step Function State Machine
+  UserOnboardingStateMachine:
+    Type: AWS::Serverless::StateMachine
     Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: apigateway.amazonaws.com
-            Action: sts:AssumeRole
+      DefinitionUri: statemachine/user-onboarding.asl.json
+      DefinitionSubstitutions:
+        SNSSubscriptionFunctionArn: !GetAtt SNSSubscriptionFunction.Arn
+      Type: STANDARD
       Policies:
-        - PolicyName: InvokeLambdaAuthorizer
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action: lambda:InvokeFunction
-                Resource: !GetAtt LambdaAuthorizerFunction.Arn
+        - LambdaInvokePolicy:
+            FunctionName: !Ref SNSSubscriptionFunction
+        - Statement:
+            - Effect: Allow
+              Action:
+                - sns:Subscribe
+                - sns:Unsubscribe
+                - sns:ListSubscriptionsByTopic
+              Resource:
+                - !Ref TasksAssignmentNotificationTopic
+                - !Ref TasksDeadlineNotificationTopic
+                - !Ref ClosedTasksNotificationTopic
+                - !Ref ReopenedTasksNotificationTopic
+                - !Ref TaskCompleteNotificationTopic
+            - Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource:
+                - !Sub "arn:aws:logs:eu-west-1:${AWS::AccountId}:log-group:/aws/lambda/*"
+
+
+  TaskDeadlineStateMachine:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      DefinitionUri: statemachine/tasks-deadline.asl.json
+      DefinitionSubstitutions:
+        TasksTable: !Ref TasksTable
+        ClosedTasksNotificationTopic: !Ref ClosedTasksNotificationTopic
+      Type: STANDARD
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TasksTable
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt ClosedTasksNotificationTopic.TopicName
+        - Statement:
+            - Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource:
+                - !Sub "arn:aws:logs:eu-west-1:${AWS::AccountId}:log-group:/aws/lambda/*"
+
+
+
+  # SQS Queue for Task Notifications
+  TasksQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: TasksQueue
+
+
+  ExpiredTasksQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: ExpiredTasksQueue
+      VisibilityTimeout: 300
+      MessageRetentionPeriod: 1209600  # 14 days
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt ExpiredTasksDLQ.Arn
+        maxReceiveCount: 3
+
+    # Dead Letter Queue for Expired Tasks
+  ExpiredTasksDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: ExpiredTasksDLQ
+      MessageRetentionPeriod: 1209600
+
+
+
+  # DynamoDB Table for Tasks
+  TasksTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: TasksTable
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: assignedUserId
+          AttributeType: S
+        - AttributeName: status
+          AttributeType: S
+        - AttributeName: deadline
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: AssignedUserIdIndex
+          KeySchema:
+            - AttributeName: assignedUserId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: StatusDeadlineIndex
+          KeySchema:
+            - AttributeName: status
+              KeyType: HASH
+            - AttributeName: deadline
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      BillingMode: PAY_PER_REQUEST
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+
+  CreateTaskFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: TaskManagerApi
+      Handler: com.roczyno.aws.task_manager.CreateTaskHandler::handleRequest
+      Environment:
+        Variables:
+          TASKS_TABLE_NAME: !Ref TasksTable
+          TASKS_QUEUE_URL: !Ref TasksQueue
+          ASSIGNMENT_TOPIC_ARN: !Ref TasksAssignmentNotificationTopic
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:PutItem
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+                - dynamodb:DeleteItem
+                - dynamodb:Query    # Added this
+                - dynamodb:Scan     # Added this
+              Resource:
+                - !GetAtt TasksTable.Arn
+                - !Sub "${TasksTable.Arn}/index/*"  # Added for indexes if you have any
+            - Effect: Allow
+              Action:
+                - sqs:SendMessage
+                - sqs:GetQueueUrl   # Added this
+                - sqs:GetQueueAttributes  # Added this
+              Resource: !GetAtt TasksQueue.Arn
+            - Effect: Allow
+              Action:
+                - sns:Publish       # Added for SNS topic
+              Resource: !Ref TasksAssignmentNotificationTopic
+            - Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource:
+                - !Sub "arn:aws:logs:eu-west-1:${AWS::AccountId}:log-group:/aws/lambda/*"
+      Events:
+        CreateTask:
+          Type: Api
+          Properties:
+            Path: /tasks
+            Method: post
+            RestApiId: !Ref MyApi
+            Auth:
+              Authorizer: CognitoAuthorizer
+
+
+
+  UpdateTaskStatusFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: TaskManagerApi
+      Handler: com.roczyno.aws.task_manager.UpdateTaskStatusHandler::handleRequest
+      Environment:
+        Variables:
+          TASKS_TABLE_NAME: !Ref TasksTable
+          ASSIGNMENT_TOPIC_ARN: !Ref TasksAssignmentNotificationTopic
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+              Resource:
+                - !GetAtt TasksTable.Arn
+                - !Sub "${TasksTable.Arn}/index/*"  # Added here for index access
+            - Effect: Allow
+              Action:
+                - sns:Publish
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource: "*"
+            - Effect: Allow
+              Action:
+                - sqs:SendMessage
+              Resource: !GetAtt TasksQueue.Arn
+            - Effect: Allow
+              Action:
+                - sns:Publish       # Added for SNS topic
+              Resource: !Ref TasksAssignmentNotificationTopic
+      Events:
+        UpdateTaskStatus:
+          Type: Api
+          Properties:
+            Path: /tasks/{taskId}/status
+            Method: put
+            RestApiId: !Ref MyApi
+            Auth:
+              Authorizer: CognitoAuthorizer
+
+
+  ReassignTaskFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: TaskManagerApi
+      Handler: com.roczyno.aws.task_manager.ReassignTaskHandler::handleRequest
+      Environment:
+        Variables:
+          TASKS_QUEUE_URL: !Ref TasksQueue
+          TASKS_TABLE_NAME: !Ref TasksTable  # Add this
+          ASSIGNMENT_TOPIC_ARN: !Ref TasksAssignmentNotificationTopic  # Add this
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+              Resource:
+                - !GetAtt TasksTable.Arn
+                - !Sub "${TasksTable.Arn}/index/*"
+            - Effect: Allow
+              Action:
+                - sns:Publish
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource: "*"
+            - Effect: Allow
+              Action:
+                - sqs:SendMessage
+              Resource: !GetAtt TasksQueue.Arn
+            - Effect: Allow
+              Action:
+                - sns:Publish       # Added for SNS topic
+              Resource: !Ref TasksAssignmentNotificationTopic
+      Events:
+        ReassignTask:
+          Type: Api
+          Properties:
+            Path: /tasks/{taskId}/reassign
+            Method: put
+            RestApiId: !Ref MyApi
+            Auth:
+              Authorizer: CognitoAuthorizer
+
+
+  GetAllTasksHandlerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: TaskManagerApi
+      Handler: com.roczyno.aws.task_manager.GetAllTasksHandler::handleRequest
+      Environment:
+        Variables:
+          TASKS_TABLE_NAME: !Ref TasksTable
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Scan
+                - dynamodb:DescribeTable
+              Resource: !GetAtt TasksTable.Arn
+            - Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource:
+                - !Sub "arn:aws:logs:eu-west-1:${AWS::AccountId}:log-group:/aws/lambda/*"
+      Events:
+        GetAllTasks:
+          Type: Api
+          Properties:
+            Path: /tasks
+            Method: get
+            RestApiId: !Ref MyApi
+            Auth:
+              Authorizer: CognitoAuthorizer
+
+
+  GetTasksByAssignedUserHandlerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: TaskManagerApi
+      Handler: com.roczyno.aws.task_manager.GetTasksByAssignedUserHandler::handleRequest
+      Environment:
+        Variables:
+          TASKS_TABLE_NAME: !Ref TasksTable
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Query
+              Resource:
+                - !GetAtt TasksTable.Arn
+                - !Sub "${TasksTable.Arn}/index/*"
+            - Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource:
+                - !Sub "arn:aws:logs:eu-west-1:${AWS::AccountId}:log-group:/aws/lambda/*"
+      Events:
+        GetTasksByAssignedUser:
+          Type: Api
+          Properties:
+            Path: /tasks/user/{userId}
+            Method: get
+            RestApiId: !Ref MyApi
+            Auth:
+              Authorizer: CognitoAuthorizer
+
+
+  DeleteTaskFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: TaskManagerApi
+      Handler: com.roczyno.aws.task_manager.DeleteTaskHandler::handleRequest
+      Environment:
+        Variables:
+          TASKS_TABLE_NAME: !Ref TasksTable
+          TASKS_QUEUE_URL: !Ref TasksQueue
+          ASSIGNMENT_TOPIC_ARN: !Ref TasksAssignmentNotificationTopic
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:DeleteItem
+                - dynamodb:GetItem
+              Resource:
+                - !GetAtt TasksTable.Arn
+                - !Sub "${TasksTable.Arn}/index/*"
+            - Effect: Allow
+              Action:
+                - sns:Publish
+              Resource: !Ref TasksAssignmentNotificationTopic
+            - Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource:
+                - !Sub "arn:aws:logs:eu-west-1:${AWS::AccountId}:log-group:/aws/lambda/*"
+      Events:
+        DeleteTask:
+          Type: Api
+          Properties:
+            Path: /tasks/{taskId}
+            Method: delete
+            RestApiId: !Ref MyApi
+            Auth:
+              Authorizer: CognitoAuthorizer
+
+
+
+  DeadlineCheckerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: TaskManagerApi
+      Handler: com.roczyno.aws.task_manager.DeadlineCheckerHandler::handleRequest
+      Environment:
+        Variables:
+          TASKS_TABLE_NAME: !Ref TasksTable
+          DEADLINE_TOPIC_ARN: !Ref TasksDeadlineNotificationTopic
+          EXPIRED_TASKS_QUEUE_URL: !Ref ExpiredTasksQueue
+          TASK_DEADLINE_STATE_MACHINE_ARN: !GetAtt TaskDeadlineStateMachine.Arn
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Scan
+                - dynamodb:Query
+              Resource:
+                - !GetAtt TasksTable.Arn
+                - !Sub "${TasksTable.Arn}/index/*"
+            - Effect: Allow
+              Action:
+                - sns:Publish
+              Resource: !Ref TasksDeadlineNotificationTopic
+            - Effect: Allow
+              Action:
+                - sqs:SendMessage
+                - sqs:GetQueueUrl
+                - sqs:GetQueueAttributes
+              Resource:
+                - !GetAtt ExpiredTasksQueue.Arn
+                - !GetAtt ExpiredTasksDLQ.Arn
+            - Effect: Allow
+              Action:
+                - states:StartExecution
+              Resource: !GetAtt TaskDeadlineStateMachine.Arn
+            - Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource:
+                - !Sub "arn:aws:logs:eu-west-1:${AWS::AccountId}:log-group:/aws/lambda/*"
+      Events:
+        ScheduledDeadlineCheck:
+          Type: Schedule
+          Properties:
+            Schedule: rate(15 minutes)
+            Name: TaskDeadlineCheck
+            Description: Checks for tasks with approaching deadlines every 15 minutes
+            Enabled: true
+
+  DeadlineCheckerAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub ${AWS::StackName}-DeadlineCheckerErrors
+      AlarmDescription: Alert when deadline checker encounters errors
+      MetricName: Errors
+      Namespace: AWS/Lambda
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref DeadlineCheckerFunction
+
+
+
 
 Outputs:
   CreateUserApi:
     Description: "API Gateway endpoint URL for Prod stage for CreateUserHandler Function"
-    Value: !Sub "https://${MyApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/users/"
+    Value: !Sub "https://${MyApi}.execute-api.eu-west-1.amazonaws.com/Prod/users/"
 
-  RegisterUserHandlerFunction:
-    Description: "RegisterUserHandler Lambda Function ARN"
-    Value: !GetAtt RegisterUserHandlerFunction.Arn
 
-  RegisterUserHandlerFunctionIamRole:
-    Description: "Implicit IAM Role created for CreateUserHandler"
-    Value: !GetAtt RegisterUserHandlerFunctionRole.Arn
 
-  ConfirmUserApi:
-    Description: "API Gateway endpoint URL for Prod stage for ConfirmUserHandler Function"
-    Value: !Sub "https://${MyApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/confirm/"
-
-  ConfirmUserHandlerFunction:
-    Description: "ConfirmUserHandler Lambda Function ARN"
-    Value: !GetAtt ConfirmUserHandlerFunction.Arn
-
-  ConfirmUserHandlerFunctionIamRole:
-    Description: "Implicit IAM Role created for ConfirmUserHandler"
-    Value: !GetAtt ConfirmUserHandlerFunctionRole.Arn

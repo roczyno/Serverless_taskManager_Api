@@ -1,11 +1,14 @@
 package com.roczyno.aws.task_manager.authorizer;
 
 import com.amazonaws.services.lambda.runtime.Context;
+import com.amazonaws.services.lambda.runtime.LambdaLogger;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyRequestEvent;
 import com.auth0.jwt.interfaces.DecodedJWT;
+import com.google.gson.Gson;
 
 import java.util.Arrays;
+import java.util.Map;
 
 /**
  * Handler for requests to Lambda function.
@@ -16,10 +19,51 @@ public class LambdaAuthorizer implements RequestHandler<APIGatewayProxyRequestEv
     public AuthorizerOutput handleRequest(final APIGatewayProxyRequestEvent input, final Context context) {
         String effect = "Allow";
         String userName;
+        LambdaLogger logger = context.getLogger();
 
-        // Get JWT from Authorization header
-        String jwt = input.getHeaders().get("Authorization");
-        if (jwt == null || jwt.isEmpty()) {
+        // Log the entire input event
+        logger.log("Input event: " + new Gson().toJson(input));
+
+        // Check if input is null
+        if (input == null) {
+            logger.log("Input event is null");
+            return createAuthorizerOutput("unauthorized", "Deny", input);
+        }
+
+        // Log the headers specifically
+        Map<String, String> headers = input.getHeaders();
+        logger.log("Headers: " + (headers != null ? new Gson().toJson(headers) : "null"));
+
+        // If headers are null, check the raw request context
+        if (headers == null) {
+            logger.log("Headers are null, checking raw request context");
+            if (input.getRequestContext() != null) {
+                logger.log("Request context: " + new Gson().toJson(input.getRequestContext()));
+            } else {
+                logger.log("Request context is also null");
+            }
+            return createAuthorizerOutput("unauthorized", "Deny", input);
+        }
+
+        // Get Authorization header - try both cases
+        String authHeader = headers.get("Authorization");
+        if (authHeader == null) {
+            authHeader = headers.get("authorization");
+        }
+
+        if (authHeader == null || authHeader.isEmpty()) {
+            logger.log("No Authorization header found");
+            return createAuthorizerOutput("unauthorized", "Deny", input);
+        }
+
+        logger.log("Found Authorization header: " + authHeader.substring(0, Math.min(authHeader.length(), 20)) + "...");
+
+        // Extract JWT token from "Bearer <jwt_token>"
+        String jwt;
+        if (authHeader.startsWith("Bearer ")) {
+            jwt = authHeader.substring(7); // Skip the "Bearer " prefix
+        } else {
+            logger.log("Invalid Authorization header format");
             return createAuthorizerOutput("unauthorized", "Deny", input);
         }
 
@@ -33,6 +77,10 @@ public class LambdaAuthorizer implements RequestHandler<APIGatewayProxyRequestEv
         try {
             DecodedJWT decodedJWT = jwtUtils.validateJwt(jwt, region, userPoolId, audience);
             userName = decodedJWT.getSubject();
+
+            // Log the token type (for debugging)
+            context.getLogger().log("Token use: " + decodedJWT.getClaim("token_use").asString());
+
         } catch (RuntimeException ex) {
             context.getLogger().log("JWT validation failed: " + ex.getMessage());
             return createAuthorizerOutput("unauthorized", "Deny", input);

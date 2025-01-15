@@ -5,9 +5,9 @@ codeuri = "/mnt/c/Users/JacobSabbathAdiaba/OneDrive - AmaliTech gGmbH/Desktop/Aw
 runtime = "java17"
 architecture = "x86_64"
 handler = "com.roczyno.aws.task_manager.RegisterUserHandler::handleRequest"
-source_hash = "1145e0717f60c2c260682b6f28e6b1ccc66fa36c37d457ca358f06dc50fb19f4"
+source_hash = "2ef1970337e95f54ac9eab38adc2ba0fde51f786c7592ff75d1f3d87c695c87d"
 manifest_hash = ""
 packagetype = "Zip"
-functions = ["RegisterUserHandlerFunction", "ConfirmUserHandlerFunction", "LoginUserHandlerFunction", "AddUserHandlerFunction", "GetUserHandlerFunction", "LambdaAuthorizerFunction"]
+functions = ["LoginUserHandlerFunction", "AddUserHandlerFunction", "GetAllUsersHandlerFunction", "SNSSubscriptionFunction", "CreateTaskFunction", "UpdateTaskStatusFunction", "ReassignTaskFunction", "GetAllTasksHandlerFunction", "GetTasksByAssignedUserHandlerFunction", "DeleteTaskFunction", "DeadlineCheckerFunction"]
 
 [layer_build_definitions]
