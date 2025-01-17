@@ -3,6 +3,7 @@ package com.roczyno.aws.task_manager.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.roczyno.aws.task_manager.model.CreateTaskRequest;
+import com.roczyno.aws.task_manager.model.Task;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -23,7 +24,6 @@ import java.util.Map;
 @Slf4j
 @RequiredArgsConstructor
 public class NotificationService {
-	private final SesClient sesClient;
 	private final SqsClient sqsClient;
 	private final ObjectMapper objectMapper;
 	private final SnsClient snsClient;
@@ -134,24 +134,38 @@ public class NotificationService {
 		}
 	}
 
-	public void notifyAdminOfStatusChange(String taskId, String status, String snsTopicArn) {
+	public void notifyAdminOfStatusChange(Task task, String status, String snsTopicArn) {
 		try {
-			log.info("Notifying admin of status change for task: {}, status: {}", taskId, status);
+			log.info("Notifying admin of status change for task: {}, status: {}", task.getId(), status);
 			Map<String, software.amazon.awssdk.services.sns.model.MessageAttributeValue> messageAttributes = new HashMap<>();
 
-			// Add notification type attribute
 			messageAttributes.put("notificationType", software.amazon.awssdk.services.sns.model.MessageAttributeValue.builder()
 					.dataType("String")
 					.stringValue("STATUS_CHANGE")
 					.build());
 
-			// Add messageType attribute for admin filtering
 			messageAttributes.put("messageType", software.amazon.awssdk.services.sns.model.MessageAttributeValue.builder()
 					.dataType("String")
 					.stringValue("ALL")
 					.build());
 
-			String notificationMessage = String.format("Task %s status updated to %s", taskId, status);
+			String notificationMessage = String.format(
+					"Task Status Change Notification\n" +
+							"Task ID: %s\n" +
+							"Task Name: %s\n" +
+							"Description: %s\n" +
+							"Previous Status: %s\n" +
+							"New Status: %s\n" +
+							"Assigned User: %s\n" +
+							"Deadline: %s",
+					task.getId(),
+					task.getName(),
+					task.getDescription(),
+					task.getStatus(),
+					status,
+					task.getAssignedUserId(),
+					task.getDeadline());
+
 			PublishRequest publishRequest = PublishRequest.builder()
 					.topicArn(snsTopicArn)
 					.message(notificationMessage)
@@ -159,72 +173,74 @@ public class NotificationService {
 					.build();
 
 			snsClient.publish(publishRequest);
-			log.info("Successfully published status change notification for task: {}", taskId);
+			log.info("Successfully published status change notification for task: {}", task.getId());
 		} catch (Exception e) {
-			log.error("Failed to notify of status change for task {}: {}, error: {}", taskId, status, e.getMessage(), e);
+			log.error("Failed to notify of status change for task {}: {}, error: {}", task.getId(), status, e.getMessage(), e);
 			throw new RuntimeException("Failed to send status change notification", e);
 		}
 	}
 
-	public void notifyNewAssignee(String snsTopicArn, String newAssignee, String taskId) {
+
+
+	public void notifyNewAssignee(Task task, String newAssignee, String snsTopicArn) {
 		try {
-			log.info("Starting notification process for new assignee: {} and task: {}", newAssignee, taskId);
+			log.info("Starting notification process for new assignee: {} and task: {}", newAssignee, task.getId());
 
 			log.debug("Creating message attributes for notification.");
 			Map<String, software.amazon.awssdk.services.sns.model.MessageAttributeValue> messageAttributes = new HashMap<>();
 
-			// Add notification type attribute
 			messageAttributes.put("notificationType", software.amazon.awssdk.services.sns.model.MessageAttributeValue.builder()
 					.dataType("String")
 					.stringValue("TASK_REASSIGNMENT")
 					.build());
 
-			// Add assignedUserId for regular user filtering
 			messageAttributes.put("assignedUserId", software.amazon.awssdk.services.sns.model.MessageAttributeValue.builder()
 					.dataType("String")
 					.stringValue(newAssignee)
 					.build());
 
-			// Add messageType attribute for admin filtering
 			messageAttributes.put("messageType", software.amazon.awssdk.services.sns.model.MessageAttributeValue.builder()
 					.dataType("String")
 					.stringValue("ALL")
 					.build());
 
-			log.info("Preparing notification message.");
-			String notificationMessage = String.format("User %s, you have been assigned a new task: %s", newAssignee, taskId);
-			log.debug("Notification message: {}", notificationMessage);
+			String notificationMessage = String.format(
+					"Task Reassignment Notification\n" +
+							"Hello %s,\n\n" +
+							"You have been assigned to the following task:\n" +
+							"Task ID: %s\n" +
+							"Task Name: %s\n" +
+							"Description: %s\n" +
+							"Current Status: %s\n" +
+							"Deadline: %s\n" +
+							"Previous Assignee: %s",
+					newAssignee,
+					task.getId(),
+					task.getName(),
+					task.getDescription(),
+					task.getStatus(),
+					task.getDeadline(),
+					task.getAssignedUserId());
 
-			log.info("Building PublishRequest for SNS.");
 			PublishRequest publishRequest = PublishRequest.builder()
 					.topicArn(snsTopicArn)
 					.message(notificationMessage)
 					.messageAttributes(messageAttributes)
 					.build();
-			log.debug("PublishRequest built successfully with topicArn: {} and message: {}", snsTopicArn, notificationMessage);
 
-			log.info("Publishing message to SNS topic: {}", snsTopicArn);
 			snsClient.publish(publishRequest);
-			log.info("Notification successfully sent for task reassignment. Task: {}, New Assignee: {}", taskId, newAssignee);
-		} catch (IllegalArgumentException e) {
-			log.error("Invalid argument provided. snsTopicArn: {}, newAssignee: {}, taskId: {}, error: {}",
-					snsTopicArn, newAssignee, taskId, e.getMessage(), e);
-			throw new RuntimeException("Invalid argument provided for notification process", e);
-		} catch (NullPointerException e) {
-			log.error("Null value encountered during notification process. Check snsClient, snsTopicArn, newAssignee, and taskId. Error: {}",
-					e.getMessage(), e);
-			throw new RuntimeException("Null value encountered during notification process", e);
+			log.info("Notification successfully sent for task reassignment. Task: {}, New Assignee: {}", task.getId(), newAssignee);
 		} catch (Exception e) {
 			log.error("Unexpected error occurred while notifying new assignee. snsTopicArn: {}, newAssignee: {}, taskId: {}, error: {}",
-					snsTopicArn, newAssignee, taskId, e.getMessage(), e);
+					snsTopicArn, newAssignee, task.getId(), e.getMessage(), e);
 			throw new RuntimeException("Failed to send assignee notification", e);
 		}
 	}
 
 
-	public void sendDeadlineNotification(String taskId, String assignedUserId, LocalDateTime deadline, String snsTopicArn) {
+	public void sendDeadlineNotification(Task task, String snsTopicArn) {
 		try {
-			log.info("Preparing deadline notification for task: {}, assigned to: {}", taskId, assignedUserId);
+			log.info("Preparing deadline notification for task: {}, assigned to: {}", task.getId(), task.getAssignedUserId());
 
 			// Create message attributes
 			Map<String, software.amazon.awssdk.services.sns.model.MessageAttributeValue> messageAttributes = new HashMap<>();
@@ -232,7 +248,7 @@ public class NotificationService {
 			// Add assigned user attribute for regular user filtering
 			messageAttributes.put("assignedUserId", software.amazon.awssdk.services.sns.model.MessageAttributeValue.builder()
 					.dataType("String")
-					.stringValue(assignedUserId)
+					.stringValue(task.getAssignedUserId())
 					.build());
 
 			// Add notification type
@@ -248,8 +264,17 @@ public class NotificationService {
 					.build());
 
 			// Create notification message
-			String message = String.format("DEADLINE ALERT: Task %s assigned to %s is due on %s",
-					taskId, assignedUserId, deadline.toString());
+			String message = String.format(
+					"URGENT: Task Deadline Approaching\n" +
+							"Task: %s\n" +
+							"Description: %s\n" +
+							"Deadline: %s\n" +
+							"Current Status: %s\n" +
+							"Time Remaining: Less than 1 hour",
+					task.getName(),
+					task.getDescription(),
+					task.getDeadline(),
+					task.getStatus());
 
 			// Send notification
 			PublishRequest publishRequest = PublishRequest.builder()
@@ -259,38 +284,15 @@ public class NotificationService {
 					.build();
 
 			snsClient.publish(publishRequest);
-			log.info("Successfully sent deadline notification for task: {}", taskId);
+			log.info("Successfully sent deadline notification for task: {}", task.getId());
 
 		} catch (SnsException e) {
-			log.error("Failed to send deadline notification for task: {}, error: {}", taskId, e.getMessage());
+			log.error("Failed to send deadline notification for task: {}, error: {}", task.getId(), e.getMessage());
 			throw new RuntimeException("Failed to send deadline notification", e);
 		}
 	}
 
-	// Overloaded method to maintain backward compatibility if needed
-	public void sendDeadlineNotification(String message, Map<String, software.amazon.awssdk.services.sns.model.MessageAttributeValue> messageAttributes, String snsTopicArn) {
-		try {
-			// Add messageType for admin filtering if not present
-			if (!messageAttributes.containsKey("messageType")) {
-				messageAttributes.put("messageType", software.amazon.awssdk.services.sns.model.MessageAttributeValue.builder()
-						.dataType("String")
-						.stringValue("ALL")
-						.build());
-			}
 
-			PublishRequest publishRequest = PublishRequest.builder()
-					.topicArn(snsTopicArn)
-					.message(message)
-					.messageAttributes(messageAttributes)
-					.build();
-
-			snsClient.publish(publishRequest);
-			log.info("Successfully sent deadline notification");
-		} catch (SnsException e) {
-			log.error("Failed to send deadline notification, error: {}", e.getMessage());
-			throw new RuntimeException("Failed to send deadline notification", e);
-		}
-	}
 
 	public void sendToExpiredTasksQueue(String messageBody, String queueUrl) {
 		SendMessageRequest sendMessageRequest = SendMessageRequest.builder()

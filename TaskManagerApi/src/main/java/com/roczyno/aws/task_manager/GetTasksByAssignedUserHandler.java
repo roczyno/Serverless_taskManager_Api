@@ -55,16 +55,16 @@ public class GetTasksByAssignedUserHandler implements RequestHandler<APIGatewayP
 				.withHeaders(CORS_HEADERS);
 
 		try {
-			// Get userId from query parameters
-			Map<String, String> queryParams = input.getQueryStringParameters();
-			if (queryParams == null || !queryParams.containsKey("userId")) {
+
+			Map<String, String> params = input.getPathParameters();
+			if (params == null || !params.containsKey("userId")) {
 				logger.log("Validation failed: Missing userId parameter");
 				return response
 						.withStatusCode(400)
-						.withBody("{\"error\":\"userId query parameter is required\"}");
+						.withBody("{\"error\":\"userId parameter is required\"}");
 			}
 
-			String userId = queryParams.get("userId");
+			String userId = params.get("userId");
 			logger.log("Retrieving tasks for user: " + userId);
 
 			// Get tasks for the user

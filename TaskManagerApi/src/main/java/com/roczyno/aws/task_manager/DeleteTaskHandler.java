@@ -8,6 +8,7 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent
 import com.roczyno.aws.task_manager.config.AwsConfig;
 import com.roczyno.aws.task_manager.service.NotificationService;
 import com.roczyno.aws.task_manager.service.TaskService;
+import com.roczyno.aws.task_manager.util.AuthorizationUtil;
 import software.amazon.awssdk.awscore.exception.AwsServiceException;
 import software.amazon.awssdk.services.dynamodb.model.ConditionalCheckFailedException;
 import software.amazon.awssdk.services.dynamodb.model.ResourceNotFoundException;
@@ -47,6 +48,9 @@ public class DeleteTaskHandler implements RequestHandler<APIGatewayProxyRequestE
 
 	@Override
 	public APIGatewayProxyResponseEvent handleRequest(APIGatewayProxyRequestEvent input, Context context) {
+		if (!AuthorizationUtil.isAdmin(input)) {
+			return AuthorizationUtil.forbidden();
+		}
 		LambdaLogger logger = context.getLogger();
 		APIGatewayProxyResponseEvent response = new APIGatewayProxyResponseEvent()
 				.withHeaders(CORS_HEADERS);

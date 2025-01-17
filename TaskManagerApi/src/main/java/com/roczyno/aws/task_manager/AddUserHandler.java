@@ -14,6 +14,7 @@ import com.roczyno.aws.task_manager.model.Role;
 import com.roczyno.aws.task_manager.model.User;
 import com.roczyno.aws.task_manager.service.CognitoUserService;
 import com.roczyno.aws.task_manager.service.NotificationService;
+import com.roczyno.aws.task_manager.util.AuthorizationUtil;
 import software.amazon.awssdk.awscore.exception.AwsServiceException;
 
 import java.util.Map;
@@ -48,7 +49,9 @@ public class AddUserHandler implements RequestHandler<APIGatewayProxyRequestEven
 	@Override
 	public APIGatewayProxyResponseEvent handleRequest(APIGatewayProxyRequestEvent input, Context context) {
 
-
+		if (!AuthorizationUtil.isAdmin(input)) {
+			return AuthorizationUtil.forbidden();
+		}
 		APIGatewayProxyResponseEvent response= new APIGatewayProxyResponseEvent()
 				.withHeaders(CORS_HEADERS);
 

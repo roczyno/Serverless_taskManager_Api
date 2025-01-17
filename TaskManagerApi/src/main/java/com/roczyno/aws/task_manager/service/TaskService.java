@@ -19,7 +19,6 @@ import software.amazon.awssdk.services.dynamodb.model.*;
 import software.amazon.awssdk.services.sfn.SfnClient;
 import software.amazon.awssdk.services.sfn.model.StartExecutionRequest;
 import software.amazon.awssdk.services.sfn.model.StartExecutionResponse;
-import software.amazon.awssdk.services.sns.model.MessageAttributeValue;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -100,7 +99,6 @@ public class TaskService {
 			logger.debug("Task ID: {}, Status: {}, User Comment: {}, Table Name: {}, SNS Topic ARN: {}",
 					taskId, status, userComment, tableName, snsTopicArn);
 
-			// Using expression-based updates consistently
 			UpdateItemRequest updateRequest = UpdateItemRequest.builder()
 					.tableName(tableName)
 					.key(Map.of("id", AttributeValue.builder().s(taskId).build()))
@@ -119,29 +117,19 @@ public class TaskService {
 					.returnValues(ReturnValue.ALL_NEW)
 					.build();
 
-			// Log the update request for debugging
-			logger.debug("Update request: {}", updateRequest);
-
 			// Perform the update
 			UpdateItemResponse response = dynamoDbClient.updateItem(updateRequest);
 
-			logger.info("Task status updated successfully: {}", taskId);
-
-			// If update successful, send notification
-			if (response != null) {
-				notificationService.notifyAdminOfStatusChange(taskId, status.toString(), snsTopicArn);
+			// If update successful, send notification with task details
+			if (response != null && response.attributes() != null) {
+				Task task = mapToTask(response.attributes());
+				notificationService.notifyAdminOfStatusChange(task, status.toString(), snsTopicArn);
 				logger.info("Notification sent for task status update: {}", taskId);
 			}
 
-		} catch (ConditionalCheckFailedException e) {
-			logger.error("Task {} not found or already in status {}: {}", taskId, status, e.getMessage());
-			throw new RuntimeException("Task update failed - Task not found or invalid status transition", e);
-		} catch (DynamoDbException e) {
-			logger.error("DynamoDB error updating task {} status: {}", taskId, e.getMessage());
-			throw new RuntimeException("DynamoDB error while updating task status", e);
 		} catch (Exception e) {
 			logger.error("Error updating task {} status: {}", taskId, e.getMessage());
-			throw new RuntimeException("Task status update failed due to an unexpected error", e);
+			throw new RuntimeException("Task status update failed", e);
 		}
 	}
 
@@ -158,35 +146,25 @@ public class TaskService {
 				throw new IllegalArgumentException("New assignee ID cannot be null or empty");
 			}
 
-			// Fetch current task
-			logger.info("Fetching current task details for ID: {}", taskId);
-			GetItemResponse currentTask = null;
-			try {
-				currentTask = dynamoDbClient.getItem(GetItemRequest.builder()
-						.tableName(tableName)
-						.key(Map.of("id", AttributeValue.builder().s(taskId).build()))
-						.build());
-			} catch (Exception e) {
-				logger.error("Failed to fetch task from DynamoDB. Task ID: {}", taskId);
-				logger.error("DynamoDB error details: {}", e.getMessage());
-				throw new RuntimeException("Failed to fetch task details", e);
-			}
+			// First, get the task to check if it exists and verify current status
+			logger.info("Fetching task details before reassignment");
+			GetItemResponse currentTaskResponse = dynamoDbClient.getItem(GetItemRequest.builder()
+					.tableName(tableName)
+					.key(Map.of("id", AttributeValue.builder().s(taskId).build()))
+					.build());
 
-			// Validate task exists
-			if (currentTask.item() == null || currentTask.item().isEmpty()) {
-				logger.error("Task not found in DynamoDB. Task ID: {}", taskId);
+			if (currentTaskResponse.item() == null || currentTaskResponse.item().isEmpty()) {
+				logger.error("Task not found with ID: {}", taskId);
 				throw new RuntimeException("Task not found");
 			}
 
-			// Log current state
-			String currentAssignee = currentTask.item().get("assignedUserId").s();
-			logger.info("Current task state - Task ID: {}, Current Assignee: {}, New Assignee: {}",
-					taskId, currentAssignee, newAssignee);
+			// Store the current task state
+			Task currentTask = mapToTask(currentTaskResponse.item());
 
 			// Perform update
 			try {
 				logger.info("Updating task assignment in DynamoDB");
-				dynamoDbClient.updateItem(UpdateItemRequest.builder()
+				UpdateItemResponse updateResponse = dynamoDbClient.updateItem(UpdateItemRequest.builder()
 						.tableName(tableName)
 						.key(Map.of("id", AttributeValue.builder().s(taskId).build()))
 						.updateExpression("SET assignedUserId = :newAssignee")
@@ -196,36 +174,29 @@ public class TaskService {
 						))
 						.returnValues(ReturnValue.ALL_NEW)
 						.build());
-				logger.info("DynamoDB update successful");
-			} catch (ConditionalCheckFailedException e) {
-				logger.error("Task update failed - Task does not exist or condition check failed");
-				logger.error("Error details: {}", e.getMessage());
-				throw e;
+
+				if (updateResponse.attributes() != null) {
+					Task updatedTask = mapToTask(updateResponse.attributes());
+					logger.info("Task successfully reassigned from {} to {}",
+							currentTask.getAssignedUserId(), newAssignee);
+
+					// Send notification with full task details
+					try {
+						logger.info("Sending notification to new assignee: {}", newAssignee);
+						notificationService.notifyNewAssignee(updatedTask, newAssignee, snsTopicArn);
+						logger.info("Notification sent successfully");
+					} catch (Exception e) {
+						logger.error("Failed to send notification to new assignee");
+						logger.warn("Task was reassigned but notification failed: {}", e.getMessage());
+					}
+				}
 			} catch (Exception e) {
-				logger.error("Failed to update task in DynamoDB");
-				logger.error("Error details: {}", e.getMessage());
+				logger.error("Failed to update task in DynamoDB: {}", e.getMessage());
 				throw new RuntimeException("Failed to update task", e);
 			}
 
-			// Send notification
-			try {
-				logger.info("Sending notification to new assignee: {}", newAssignee);
-				notificationService.notifyNewAssignee(snsTopicArn, newAssignee, taskId);
-				logger.info("Notification sent successfully");
-			} catch (Exception e) {
-				logger.error("Failed to send notification to new assignee");
-				logger.error("Notification error details: {}", e.getMessage());
-				// Don't throw here - task is already reassigned
-				logger.warn("Task was reassigned but notification failed");
-			}
-
-			logger.info("Task reassignment completed successfully");
-
 		} catch (Exception e) {
-			logger.error("Task reassignment failed");
-			logger.error("Error type: {}", e.getClass().getName());
-			logger.error("Error message: {}", e.getMessage());
-			logger.error("Stack trace: ", e);
+			logger.error("Task reassignment failed: {}", e.getMessage());
 			throw e;
 		}
 	}
@@ -297,6 +268,74 @@ public class TaskService {
 		}
 	}
 
+	public void reopenTask(String taskId, String tableName, String snsTopicArn) {
+		logger.info("Starting task reopening process for task ID: {}", taskId);
+
+		try {
+			// Validate input parameters
+			if (taskId == null || taskId.trim().isEmpty()) {
+				logger.error("Invalid task ID provided");
+				throw new IllegalArgumentException("Task ID cannot be null or empty");
+			}
+
+			// First, get the task to check if it exists and verify current status
+			logger.info("Fetching task details before reopening");
+			GetItemResponse taskResponse = dynamoDbClient.getItem(GetItemRequest.builder()
+					.tableName(tableName)
+					.key(Map.of("id", AttributeValue.builder().s(taskId).build()))
+					.build());
+
+			if (taskResponse.item() == null || taskResponse.item().isEmpty()) {
+				logger.error("Task not found with ID: {}", taskId);
+				throw new RuntimeException("Task not found");
+			}
+
+			String currentStatus = taskResponse.item().get("status").s();
+			if (Status.OPEN.toString().equals(currentStatus)) {
+				logger.warn("Task {} is already in OPEN status", taskId);
+				return;
+			}
+
+			// Update the task status to OPEN
+			logger.info("Updating task status to OPEN");
+			UpdateItemRequest updateRequest = UpdateItemRequest.builder()
+					.tableName(tableName)
+					.key(Map.of("id", AttributeValue.builder().s(taskId).build()))
+					.updateExpression("SET #status = :newStatus, #reopenTime = :reopenTime")
+					.conditionExpression("attribute_exists(id)")
+					.expressionAttributeNames(Map.of(
+							"#status", "status",
+							"#reopenTime", "lastUpdatedAt"
+					))
+					.expressionAttributeValues(Map.of(
+							":newStatus", AttributeValue.builder().s(Status.OPEN.toString()).build(),
+							":reopenTime", AttributeValue.builder().s(LocalDateTime.now().toString()).build()
+					))
+					.returnValues(ReturnValue.ALL_NEW)
+					.build();
+
+			UpdateItemResponse updateResponse = dynamoDbClient.updateItem(updateRequest);
+
+			if (updateResponse.attributes() != null && !updateResponse.attributes().isEmpty()) {
+				logger.info("Task successfully reopened: {}", taskId);
+
+				// Map the updated task and send notification
+				Task updatedTask = mapToTask(updateResponse.attributes());
+				try {
+					logger.info("Sending reopening notification");
+					notificationService.notifyAdminOfStatusChange(updatedTask, "REOPENED", snsTopicArn);
+					logger.info("Reopening notification sent successfully");
+				} catch (Exception e) {
+					logger.warn("Failed to send reopening notification, but task was reopened successfully: {}", e.getMessage());
+				}
+			}
+
+		} catch (Exception e) {
+			logger.error("Unexpected error during task reopening: {}", e.getMessage(), e);
+			throw new RuntimeException("Task reopening failed due to an unexpected error", e);
+		}
+	}
+
 	public List<Task> getTasksByAssignedUser(String userId, String tableName) {
 		logger.info("Retrieving tasks for user: {}", userId);
 		try {
@@ -342,9 +381,8 @@ public class TaskService {
 				throw new RuntimeException("Task not found");
 			}
 
-			// Store relevant task details for notification
-			String assignedUserId = taskResponse.item().get("assignedUserId").s();
-			String taskName = taskResponse.item().get("name").s();
+			// Map the task for notification before deletion
+			Task task = mapToTask(taskResponse.item());
 
 			// Delete the task
 			logger.info("Deleting task from DynamoDB");
@@ -363,30 +401,13 @@ public class TaskService {
 				// Send notification about task deletion
 				try {
 					logger.info("Sending deletion notification");
-					Map<String, String> notificationDetails = Map.of(
-							"taskId", taskId,
-							"taskName", taskName,
-							"assignedUserId", assignedUserId,
-							"action", "DELETED",
-							"timestamp", LocalDateTime.now().toString()
-					);
-
-					notificationService.notifyAdminOfStatusChange(taskId, "DELETED", snsTopicArn);
+					notificationService.notifyAdminOfStatusChange(task, "DELETED", snsTopicArn);
 					logger.info("Deletion notification sent successfully");
 				} catch (Exception e) {
 					logger.warn("Failed to send deletion notification, but task was deleted successfully: {}", e.getMessage());
-					// Don't throw here as the primary operation (deletion) was successful
 				}
 			}
 
-		} catch (ConditionalCheckFailedException e) {
-			logger.error("Task deletion failed - Task does not exist: {}", taskId);
-			throw new RuntimeException("Task deletion failed - Task not found", e);
-		} catch (DynamoDbException e) {
-			logger.error("DynamoDB error during task deletion: {}", e.getMessage());
-			logger.error("Error Code: {}", e.awsErrorDetails().errorCode());
-			logger.error("Status Code: {}", e.statusCode());
-			throw new RuntimeException("DynamoDB error while deleting task", e);
 		} catch (Exception e) {
 			logger.error("Unexpected error during task deletion: {}", e.getMessage(), e);
 			throw new RuntimeException("Task deletion failed due to an unexpected error", e);
@@ -397,28 +418,8 @@ public class TaskService {
 	private void sendDeadlineNotification(Task task, String snsTopicArn) {
 		logger.info("Preparing deadline notification for task: {}", task.getId());
 
-		Map<String, MessageAttributeValue> messageAttributes = new HashMap<>();
-		messageAttributes.put("userId", MessageAttributeValue.builder()
-				.dataType("String")
-				.stringValue(task.getAssignedUserId())
-				.build());
-
-		String message = String.format(
-				"URGENT: Task Deadline Approaching\n" +
-						"Task: %s\n" +
-						"Description: %s\n" +
-						"Deadline: %s\n" +
-						"Current Status: %s\n" +
-						"Time Remaining: Less than 1 hour",
-				task.getName(),
-				task.getDescription(),
-				task.getDeadline(),
-				task.getStatus());
-
-		logger.debug("Notification message for task {}: {}", task.getId(), message);
-
 		try {
-			notificationService.sendDeadlineNotification(task.getId(),task.getAssignedUserId(),task.getDeadline(), snsTopicArn);
+			notificationService.sendDeadlineNotification(task, snsTopicArn);
 			logger.info("Successfully sent deadline notification for task: {}", task.getId());
 		} catch (Exception e) {
 			logger.error("Failed to send deadline notification for task {}: {}", task.getId(), e.getMessage());
@@ -461,9 +462,13 @@ public class TaskService {
 		return Task.builder()
 				.id(item.get("id").s())
 				.name(item.get("name").s())
+				.description(item.getOrDefault("description",
+						AttributeValue.builder().s("").build()).s())
 				.assignedUserId(item.get("assignedUserId").s())
 				.deadline(LocalDateTime.parse(item.get("deadline").s()))
 				.status(Status.valueOf(item.get("status").s()))
+				.userComment(item.getOrDefault("userComment",
+						AttributeValue.builder().s("").build()).s())
 				.build();
 	}
 
@@ -536,6 +541,8 @@ public class TaskService {
 			throw new RuntimeException("Failed to build scan request", e);
 		}
 	}
+
+
 
 	private void processTask(Task task, String snsTopicArn, String methodId,
 							 AtomicInteger approachingCount, AtomicInteger expiredCount,
@@ -658,7 +665,7 @@ public class TaskService {
 							"#taskDeadline", "deadline"
 					))
 					.expressionAttributeValues(Map.of(
-							":status", AttributeValue.builder().s("ACTIVE").build(),
+							":status", AttributeValue.builder().s("OPEN").build(),
 							":now", AttributeValue.builder().s(now.toString()).build()
 					))
 					.build();

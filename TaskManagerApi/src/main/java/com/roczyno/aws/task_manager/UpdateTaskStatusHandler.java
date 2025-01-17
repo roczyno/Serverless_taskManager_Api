@@ -40,7 +40,7 @@ public class UpdateTaskStatusHandler implements RequestHandler<APIGatewayProxyRe
 				AwsConfig.snsClient()
 		);
 		this.taskService = new TaskService(AwsConfig.dynamoDbClient(), notificationService,AwsConfig.objectMapper(),AwsConfig.sfnClient());
-		this.snsTopicArn = System.getenv("ASSIGNMENT_TOPIC_ARN");
+		this.snsTopicArn = System.getenv("COMPLETE_TOPIC_ARN");
 		this.tableName = System.getenv("TASKS_TABLE_NAME");
 
 		// Validate environment variables

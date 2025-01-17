@@ -4,5 +4,6 @@ public enum Status {
 	OPEN,
 	IN_PROGRESS,
 	COMPLETED,
-	CLOSED
+	CLOSED,
+	EXPIRED
 }

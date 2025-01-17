@@ -80,9 +80,11 @@ KTaskManagerApi/src/main/java/com/roczyno/aws/task_manager/model/Status.java,8\
 UTaskManagerApi/src/main/java/com/roczyno/aws/task_manager/DeadlineCheckerHandler.java,3\3\33d8ba51002c08c48756e868e8af0bf10aead303
 T
 $statemachine/tasks-deadline.asl.json,0\8\08054b2596fad5e2820e873765e53bd14d724ad4
-‘
-aTaskManagerApi/src/main/java/com/roczyno/aws/task_manager/model/ExpiredTaskStepFunctionInput.java,7\1\71bbf06f85ea4430969ba529c3b2e35a9baa4729
 €
 PTaskManagerApi/src/main/java/com/roczyno/aws/task_manager/DeleteTaskHandler.java,e\e\ee869aa5646eb4db52d6092126bee2534a5d04ab
 …
 UTaskManagerApi/src/main/java/com/roczyno/aws/task_manager/model/ExpiredTaskInput.java,4\f\4f84691bf705464b5567f6abd456759ca0694c85
+…
+UTaskManagerApi/src/main/java/com/roczyno/aws/task_manager/util/AuthorizationUtil.java,c\a\ca14495547ed5047381d2a6489a2e9e4335cd6a1
+€
+PTaskManagerApi/src/main/java/com/roczyno/aws/task_manager/ReopenTaskHandler.java,3\5\35111900c730bf55a5035b19881dc457cc6af683

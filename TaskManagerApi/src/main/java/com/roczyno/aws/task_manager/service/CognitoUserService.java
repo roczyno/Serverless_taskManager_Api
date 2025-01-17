@@ -381,6 +381,7 @@ public class CognitoUserService {
 				// Process user attributes
 				JsonObject attributes = new JsonObject();
 				String userRole = null;
+				String name = null;
 
 				for (AttributeType attribute : user.attributes()) {
 					attributes.addProperty(attribute.name(), attribute.value());
@@ -390,6 +391,12 @@ public class CognitoUserService {
 						userRole = attribute.value();
 						userDetails.addProperty("role", userRole);
 					}
+
+					// Extract name attribute
+					if (attribute.name().equals("name")) {
+						name = attribute.value();
+						userDetails.addProperty("name", name);
+					}
 				}
 
 				userDetails.add("attributes", attributes);
@@ -397,6 +404,11 @@ public class CognitoUserService {
 				// If role wasn't found in custom attributes, set as null or default
 				if (userRole == null) {
 					userDetails.addProperty("role", "UNDEFINED");
+				}
+
+				// If name wasn't found, set as null or empty string
+				if (name == null) {
+					userDetails.addProperty("name", "");
 				}
 
 				users.add(userDetails);

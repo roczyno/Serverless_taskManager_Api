@@ -8,6 +8,6 @@ handler = "com.roczyno.aws.task_manager.RegisterUserHandler::handleRequest"
 source_hash = "2ef1970337e95f54ac9eab38adc2ba0fde51f786c7592ff75d1f3d87c695c87d"
 manifest_hash = ""
 packagetype = "Zip"
-functions = ["LoginUserHandlerFunction", "AddUserHandlerFunction", "GetAllUsersHandlerFunction", "SNSSubscriptionFunction", "CreateTaskFunction", "UpdateTaskStatusFunction", "ReassignTaskFunction", "GetAllTasksHandlerFunction", "GetTasksByAssignedUserHandlerFunction", "DeleteTaskFunction", "DeadlineCheckerFunction"]
+functions = ["LoginUserHandlerFunction", "AddUserHandlerFunction", "GetAllUsersHandlerFunction", "SNSSubscriptionFunction", "CreateTaskFunction", "UpdateTaskStatusFunction", "ReopenTaskFunction", "ReassignTaskFunction", "GetAllTasksHandlerFunction", "GetTasksByAssignedUserHandlerFunction", "DeleteTaskFunction", "DeadlineCheckerFunction"]
 
 [layer_build_definitions]

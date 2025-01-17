@@ -14,9 +14,14 @@ Globals:
     MemorySize: 512
     Environment:
       Variables:
-        TM_COGNITO_POOL_CLIENT_ID: 2hac15m5nrvsq4anq49mitpker
-        TM_COGNITO_POOL_SECRET_ID: 2gvqhs28u14pbm08ar1d8h0f6hp6blp4rkaehu8p6ehfvme53cm
-        TM_COGNITO_USER_POOL_ID: eu-west-1_HFpwlSV34
+        TM_COGNITO_POOL_CLIENT_ID:
+          Ref: TaskManagerUserPoolClient
+        TM_COGNITO_POOL_SECRET_ID:
+          Fn::GetAtt:
+          - TaskManagerUserPoolClient
+          - ClientSecret
+        TM_COGNITO_USER_POOL_ID:
+          Ref: TaskManagerUserPool
         ASSIGNMENT_TOPIC_ARN:
           Ref: TasksAssignmentNotificationTopic
         DEADLINE_TOPIC_ARN:
@@ -28,6 +33,95 @@ Globals:
         COMPLETE_TOPIC_ARN:
           Ref: TaskCompleteNotificationTopic
 Resources:
+  TaskManagerUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: TaskManagerUserPool
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+        - Name: verified_email
+          Priority: 1
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true
+      AutoVerifiedAttributes:
+      - email
+      EmailConfiguration:
+        EmailSendingAccount: COGNITO_DEFAULT
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          RequireUppercase: true
+      Schema:
+      - Name: email
+        AttributeDataType: String
+        Mutable: true
+        Required: true
+      - Name: name
+        AttributeDataType: String
+        Mutable: true
+        Required: true
+      - Name: userId
+        AttributeDataType: String
+        Mutable: true
+        Required: false
+      - Name: role
+        AttributeDataType: String
+        Mutable: true
+        Required: false
+      UsernameAttributes:
+      - email
+      UsernameConfiguration:
+        CaseSensitive: false
+  TaskManagerUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId:
+        Ref: TaskManagerUserPool
+      ClientName: TaskManagerClient
+      GenerateSecret: true
+      ExplicitAuthFlows:
+      - ALLOW_USER_PASSWORD_AUTH
+      - ALLOW_ADMIN_USER_PASSWORD_AUTH
+      - ALLOW_USER_SRP_AUTH
+      - ALLOW_REFRESH_TOKEN_AUTH
+      PreventUserExistenceErrors: ENABLED
+      AllowedOAuthFlows:
+      - code
+      AllowedOAuthScopes:
+      - email
+      - openid
+      - profile
+      AllowedOAuthFlowsUserPoolClient: true
+      CallbackURLs:
+      - http://localhost:5173
+      SupportedIdentityProviders:
+      - COGNITO
+  TaskManagerUserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      Domain:
+        Fn::Sub: taskmanager-${AWS::AccountId}
+      UserPoolId:
+        Ref: TaskManagerUserPool
+  AdminGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: ADMIN
+      UserPoolId:
+        Ref: TaskManagerUserPool
+      Description: Administrator group
+      Precedence: 1
+  UserGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: USER
+      UserPoolId:
+        Ref: TaskManagerUserPool
+      Description: Regular user group
+      Precedence: 2
   MyApi:
     Type: AWS::Serverless::Api
     Properties:
@@ -37,11 +131,14 @@ Resources:
         Authorizers:
           CognitoAuthorizer:
             UserPoolArn:
-              Fn::Sub: arn:aws:cognito-idp:eu-west-1:${AWS::AccountId}:userpool/eu-west-1_HFpwlSV34
+              Fn::GetAtt:
+              - TaskManagerUserPool
+              - Arn
+        AddDefaultAuthorizerToCorsPreflight: false
       Cors:
         AllowMethods: '''GET,POST,PUT,DELETE,OPTIONS'''
         AllowHeaders: '''Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Requested-With'''
-        AllowOrigin: '''http://localhost:5173'''
+        AllowOrigin: '''*'''
         MaxAge: '''3600'''
   LoginUserHandlerFunction:
     Type: AWS::Serverless::Function
@@ -67,23 +164,10 @@ Resources:
       Handler: com.roczyno.aws.task_manager.AddUserHandler::handleRequest
       Environment:
         Variables:
-          TM_COGNITO_POOL_CLIENT_ID: 2hac15m5nrvsq4anq49mitpker
-          TM_COGNITO_POOL_SECRET_ID: 2gvqhs28u14pbm08ar1d8h0f6hp6blp4rkaehu8p6ehfvme53cm
-          TM_COGNITO_USER_POOL_ID: eu-west-1_HFpwlSV34
           USER_ONBOARDING_STATE_MACHINE_ARN:
             Fn::GetAtt:
             - UserOnboardingStateMachine
             - Arn
-          ASSIGNMENT_TOPIC_ARN:
-            Ref: TasksAssignmentNotificationTopic
-          DEADLINE_TOPIC_ARN:
-            Ref: TasksDeadlineNotificationTopic
-          CLOSED_TOPIC_ARN:
-            Ref: ClosedTasksNotificationTopic
-          REOPENED_TOPIC_ARN:
-            Ref: ReopenedTasksNotificationTopic
-          COMPLETE_TOPIC_ARN:
-            Ref: TaskCompleteNotificationTopic
       Policies:
       - Version: '2012-10-17'
         Statement:
@@ -93,7 +177,10 @@ Resources:
           - cognito-idp:AdminAddUserToGroup
           - cognito-idp:AdminSetUserPassword
           - cognito-idp:UpdateUserPool
-          Resource: arn:aws:cognito-idp:eu-west-1:897729111286:userpool/eu-west-1_HFpwlSV34
+          Resource:
+            Fn::GetAtt:
+            - TaskManagerUserPool
+            - Arn
         - Effect: Allow
           Action:
           - ses:SendEmail
@@ -132,14 +219,18 @@ Resources:
       Handler: com.roczyno.aws.task_manager.GetAllUsersHandler::handleRequest
       Environment:
         Variables:
-          USER_POOL_ID: eu-west-1_HFpwlSV34
+          USER_POOL_ID:
+            Ref: TaskManagerUserPool
       Policies:
       - Version: '2012-10-17'
         Statement:
         - Effect: Allow
           Action:
           - cognito-idp:ListUsers
-          Resource: arn:aws:cognito-idp:eu-west-1:897729111286:userpool/eu-west-1_HFpwlSV34
+          Resource:
+            Fn::GetAtt:
+            - TaskManagerUserPool
+            - Arn
         - Effect: Allow
           Action:
           - ses:SendEmail
@@ -257,8 +348,8 @@ Resources:
       DefinitionSubstitutions:
         TasksTable:
           Ref: TasksTable
-        ClosedTasksNotificationTopic:
-          Ref: ClosedTasksNotificationTopic
+        TasksDeadlineNotificationTopic:
+          Ref: TasksDeadlineNotificationTopic
       Type: STANDARD
       Policies:
       - DynamoDBCrudPolicy:
@@ -267,7 +358,7 @@ Resources:
       - SNSPublishMessagePolicy:
           TopicName:
             Fn::GetAtt:
-            - ClosedTasksNotificationTopic
+            - TasksDeadlineNotificationTopic
             - TopicName
       - Statement:
         - Effect: Allow
@@ -403,8 +494,8 @@ Resources:
         Variables:
           TASKS_TABLE_NAME:
             Ref: TasksTable
-          ASSIGNMENT_TOPIC_ARN:
-            Ref: TasksAssignmentNotificationTopic
+          COMPLETE_TOPIC_ARN:
+            Ref: TaskCompleteNotificationTopic
       Policies:
       - Version: '2012-10-17'
         Statement:
@@ -440,7 +531,7 @@ Resources:
         UpdateTaskStatus:
           Type: Api
           Properties:
-            Path: /tasks/{taskId}/status
+            Path: /tasks/status
             Method: put
             RestApiId:
               Ref: MyApi
@@ -448,6 +539,60 @@ Resources:
               Authorizer: CognitoAuthorizer
     Metadata:
       SamResourceId: UpdateTaskStatusFunction
+  ReopenTaskFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ReopenTaskFunction
+      Handler: com.roczyno.aws.task_manager.ReopenTaskHandler::handleRequest
+      Environment:
+        Variables:
+          TASKS_TABLE_NAME:
+            Ref: TasksTable
+          REOPENED_TOPIC_ARN:
+            Ref: ReopenedTasksNotificationTopic
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - dynamodb:GetItem
+          - dynamodb:UpdateItem
+          Resource:
+          - Fn::GetAtt:
+            - TasksTable
+            - Arn
+          - Fn::Sub: ${TasksTable.Arn}/index/*
+        - Effect: Allow
+          Action:
+          - sns:Publish
+          - logs:CreateLogGroup
+          - logs:CreateLogStream
+          - logs:PutLogEvents
+          Resource: '*'
+        - Effect: Allow
+          Action:
+          - sqs:SendMessage
+          Resource:
+            Fn::GetAtt:
+            - TasksQueue
+            - Arn
+        - Effect: Allow
+          Action:
+          - sns:Publish
+          Resource:
+            Ref: TasksAssignmentNotificationTopic
+      Events:
+        ReopenTask:
+          Type: Api
+          Properties:
+            Path: /tasks/reopen
+            Method: post
+            RestApiId:
+              Ref: MyApi
+            Auth:
+              Authorizer: CognitoAuthorizer
+    Metadata:
+      SamResourceId: ReopenTaskFunction
   ReassignTaskFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -496,7 +641,7 @@ Resources:
         ReassignTask:
           Type: Api
           Properties:
-            Path: /tasks/{taskId}/reassign
+            Path: /tasks/reassign
             Method: put
             RestApiId:
               Ref: MyApi
@@ -720,7 +865,29 @@ Resources:
         Value:
           Ref: DeadlineCheckerFunction
 Outputs:
-  CreateUserApi:
-    Description: API Gateway endpoint URL for Prod stage for CreateUserHandler Function
+  UserPoolId:
+    Description: ID of the Cognito User Pool
     Value:
-      Fn::Sub: https://${MyApi}.execute-api.eu-west-1.amazonaws.com/Prod/users/
+      Ref: TaskManagerUserPool
+  UserPoolClientId:
+    Description: ID of the Cognito User Pool Client
+    Value:
+      Ref: TaskManagerUserPoolClient
+  UserPoolClientSecret:
+    Description: Secret of the Cognito User Pool Client
+    Value:
+      Fn::GetAtt:
+      - TaskManagerUserPoolClient
+      - ClientSecret
+  ApiEndpoint:
+    Description: API Gateway endpoint URL for Prod stage
+    Value:
+      Fn::Sub: https://${MyApi}.execute-api.${AWS::Region}.amazonaws.com/Prod
+  CognitoLoginUrl:
+    Description: Cognito hosted UI login URL
+    Value:
+      Fn::Sub: https://${TaskManagerUserPoolDomain}.auth.${AWS::Region}.amazoncognito.com/login?client_id=${TaskManagerUserPoolClient}&response_type=code&scope=email+openid+profile&redirect_uri=http://localhost:5173
+  CognitoDomain:
+    Description: Cognito User Pool Domain
+    Value:
+      Fn::Sub: https://${TaskManagerUserPoolDomain}.auth.${AWS::Region}.amazoncognito.com
