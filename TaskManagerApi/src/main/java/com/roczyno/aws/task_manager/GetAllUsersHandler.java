@@ -23,7 +23,6 @@ public class GetAllUsersHandler implements RequestHandler<APIGatewayProxyRequest
 
 	public GetAllUsersHandler() {
 		NotificationService notificationService = new NotificationService(
-				AwsConfig.sesClient(),
 				AwsConfig.sqsClient(),
 				AwsConfig.objectMapper(),
 				AwsConfig.snsClient()

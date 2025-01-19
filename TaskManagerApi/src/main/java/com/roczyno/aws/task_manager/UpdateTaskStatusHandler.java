@@ -34,7 +34,6 @@ public class UpdateTaskStatusHandler implements RequestHandler<APIGatewayProxyRe
 
 	public UpdateTaskStatusHandler() {
 		NotificationService notificationService = new NotificationService(
-				AwsConfig.sesClient(),
 				AwsConfig.sqsClient(),
 				AwsConfig.objectMapper(),
 				AwsConfig.snsClient()

@@ -28,7 +28,6 @@ public class DeleteTaskHandler implements RequestHandler<APIGatewayProxyRequestE
 
 	public DeleteTaskHandler() {
 		NotificationService notificationService = new NotificationService(
-				AwsConfig.sesClient(),
 				AwsConfig.sqsClient(),
 				AwsConfig.objectMapper(),
 				AwsConfig.snsClient()

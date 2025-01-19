@@ -1,5 +1,6 @@
 package com.roczyno.aws.task_manager.service;
 
+import com.amazonaws.services.lambda.runtime.LambdaLogger;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.roczyno.aws.task_manager.model.CreateTaskRequest;
 import com.roczyno.aws.task_manager.model.ExpiredTaskInput;
@@ -38,7 +39,7 @@ public class TaskService {
 	private final NotificationService notificationService;
 	private final ObjectMapper objectMapper;
 	private final SfnClient sfnClient;
-
+	private LambdaLogger lambdaLogger;
 
 	private static final Logger logger = LoggerFactory.getLogger(TaskService.class);
 
@@ -415,32 +416,41 @@ public class TaskService {
 	}
 
 
+
+
+	public void setLogger(LambdaLogger lambdaLogger) {
+		this.lambdaLogger = lambdaLogger;
+	}
+
 	private void sendDeadlineNotification(Task task, String snsTopicArn) {
-		logger.info("Preparing deadline notification for task: {}", task.getId());
+		lambdaLogger.log(String.format("Preparing deadline notification for task: %s", task.getId()));
 
 		try {
 			notificationService.sendDeadlineNotification(task, snsTopicArn);
-			logger.info("Successfully sent deadline notification for task: {}", task.getId());
+			lambdaLogger.log(String.format("Successfully sent deadline notification for task: %s", task.getId()));
 		} catch (Exception e) {
-			logger.error("Failed to send deadline notification for task {}: {}", task.getId(), e.getMessage());
+			lambdaLogger.log(String.format("Failed to send deadline notification for task %s: %s",
+					task.getId(), e.getMessage()));
 			throw e;
 		}
 	}
 
-
 	private void startExpirationWorkflow(Task task, String stepFunctionArn) {
 		try {
-			logger.info("Starting expiration workflow for task {} with deadline {}", task.getId(), task.getDeadline());
+			lambdaLogger.log(String.format("Starting expiration workflow for task %s with deadline %s",
+					task.getId(), task.getDeadline()));
 
 			ExpiredTaskInput input = ExpiredTaskInput.builder()
 					.taskId(task.getId())
 					.taskName(task.getName())
 					.assignedUserId(task.getAssignedUserId())
-					.deadline(task.getDeadline())
+					.deadline(String.valueOf(task.getDeadline()))
+					.snsTopicArn(System.getenv("CLOSED_TOPIC_ARN"))
 					.build();
 
+			lambdaLogger.log(String.format("Current SNS Topic ARN value for step function: %s", System.getenv("CLOSED_TOPIC_ARN")));
 			String jsonInput = objectMapper.writeValueAsString(input);
-			logger.debug("Step Function input for task {}: {}", task.getId(), jsonInput);
+			lambdaLogger.log(String.format("Step Function input for task %s: %s", task.getId(), jsonInput));
 
 			StartExecutionRequest executionRequest = StartExecutionRequest.builder()
 					.stateMachineArn(stepFunctionArn)
@@ -449,12 +459,13 @@ public class TaskService {
 					.build();
 
 			StartExecutionResponse response = sfnClient.startExecution(executionRequest);
-			logger.info("Started expiration workflow for task {} with execution ARN: {}",
-					task.getId(), response.executionArn());
+			lambdaLogger.log(String.format("Started expiration workflow for task %s with execution ARN: %s",
+					task.getId(), response.executionArn()));
+
 
 		} catch (Exception e) {
-			logger.error("Failed to start expiration workflow for task {}: {}",
-					task.getId(), e.getMessage(), e);
+			lambdaLogger.log(String.format("Failed to start expiration workflow for task %s: %s",
+					task.getId(), e.getMessage()));
 			throw new RuntimeException("Failed to process expired task", e);
 		}
 	}
@@ -479,43 +490,42 @@ public class TaskService {
 		LocalDateTime now = LocalDateTime.now();
 		LocalDateTime oneHourFromNow = now.plusHours(1);
 
-		logger.info("[MethodID: {}] Starting deadline check at: {}", methodId, now);
-		logger.debug("[MethodID: {}] Parameters - Table: {}, SNS Topic: {}", methodId, tableName, snsTopicArn);
-		logger.info("[MethodID: {}] Checking for tasks with deadlines between {} and {}",
-				methodId, now, oneHourFromNow);
+		lambdaLogger.log(String.format("[MethodID: %s] Starting deadline check at: %s", methodId, now));
+		lambdaLogger.log(String.format("[MethodID: %s] Parameters - Table: %s, SNS Topic: %s",
+				methodId, tableName, snsTopicArn));
+		lambdaLogger.log(String.format("[MethodID: %s] Checking for tasks with deadlines between %s and %s",
+				methodId, now, oneHourFromNow));
 
 		try {
 			DynamoDbTable<Task> taskTable = enhancedClient.table(tableName, TableSchema.fromBean(Task.class));
 			logger.debug("[MethodID: {}] Successfully initialized DynamoDB table reference", methodId);
-
-			// Build scan request with modified status check for "OPEN"
 			ScanEnhancedRequest scanRequest = buildScanRequest(now, oneHourFromNow);
-			logger.debug("[MethodID: {}] Scan request built with filter: {}",
-					methodId, scanRequest.filterExpression().expression());
+			lambdaLogger.log(String.format("[MethodID: %s] Scan request built with filter: %s",
+					methodId, scanRequest.filterExpression().expression()));
 
 			AtomicInteger approachingDeadlineCount = new AtomicInteger(0);
 			AtomicInteger expiredCount = new AtomicInteger(0);
 			AtomicInteger errorCount = new AtomicInteger(0);
+
 
 			taskTable.scan(scanRequest)
 					.items()
 					.forEach(task -> processTask(task, snsTopicArn, methodId,
 							approachingDeadlineCount, expiredCount, errorCount, now));
 
-			logger.info("[MethodID: {}] Deadline check completed. Statistics:\n" +
-							"- Tasks approaching deadline: {}\n" +
-							"- Expired tasks: {}\n" +
-							"- Errors encountered: {}",
+			lambdaLogger.log(String.format("[MethodID: %s] Deadline check completed. Statistics:\n" +
+							"- Tasks approaching deadline: %d\n" +
+							"- Expired tasks: %d\n" +
+							"- Errors encountered: %d",
 					methodId, approachingDeadlineCount.get(),
-					expiredCount.get(), errorCount.get());
+					expiredCount.get(), errorCount.get()));
 
 		} catch (Exception e) {
-			logger.error("[MethodID: {}] Critical error during deadline check: {}",
-					methodId, e.getMessage(), e);
+			lambdaLogger.log(String.format("[MethodID: %s] Critical error during deadline check: %s",
+					methodId, e.getMessage()));
 			throw new RuntimeException("Deadline check failed", e);
 		}
 	}
-
 	private ScanEnhancedRequest buildScanRequest(LocalDateTime now, LocalDateTime oneHourFromNow) {
 		logger.debug("Building scan request for time range: {} to {}", now, oneHourFromNow);
 
@@ -603,18 +613,18 @@ public class TaskService {
 		String methodId = UUID.randomUUID().toString();
 		LocalDateTime now = LocalDateTime.now();
 
-		logger.info("[MethodID: {}] Starting expired tasks processing at: {}", methodId, now);
-		logger.debug("[MethodID: {}] Parameters - Table: {}, Step Function ARN: {}",
-				methodId, tableName, stepFunctionArn);
+		lambdaLogger.log(String.format("[MethodID: %s] Starting expired tasks processing at: %s", methodId, now));
+		lambdaLogger.log(String.format("[MethodID: %s] Parameters - Table: %s, Step Function ARN: %s",
+				methodId, tableName, stepFunctionArn));
 
 		try {
 			QueryRequest queryRequest = buildExpiredTasksQuery(tableName, now);
-			logger.debug("[MethodID: {}] Query request built with condition: {}",
-					methodId, queryRequest.keyConditionExpression());
+			lambdaLogger.log(String.format("[MethodID: %s] Query request built with condition: %s",
+					methodId, queryRequest.keyConditionExpression()));
 
 			QueryResponse response = dynamoDbClient.query(queryRequest);
 			int totalTasks = response.count();
-			logger.info("[MethodID: {}] Found {} expired tasks to process", methodId, totalTasks);
+			lambdaLogger.log(String.format("[MethodID: %s] Found %d expired tasks to process", methodId, totalTasks));
 
 			AtomicInteger processedCount = new AtomicInteger(0);
 			AtomicInteger errorCount = new AtomicInteger(0);
@@ -623,32 +633,31 @@ public class TaskService {
 				Task task = mapToTask(item);
 				String taskId = task.getId();
 
-				logger.info("[MethodID: {}][TaskID: {}] Processing expired task - Name: {}, Deadline: {}",
-						methodId, taskId, task.getName(), task.getDeadline());
+				lambdaLogger.log(String.format("[MethodID: %s][TaskID: %s] Processing expired task - Name: %s, Deadline: %s",
+						methodId, taskId, task.getName(), task.getDeadline()));
 
 				try {
 					long startTime = System.currentTimeMillis();
 					startExpirationWorkflow(task, stepFunctionArn);
 					processedCount.incrementAndGet();
-					logger.info("[MethodID: {}][TaskID: {}] Successfully processed task in {}ms",
-							methodId, taskId, System.currentTimeMillis() - startTime);
+					lambdaLogger.log(String.format("[MethodID: %s][TaskID: %s] Successfully processed task in %dms",
+							methodId, taskId, System.currentTimeMillis() - startTime));
 				} catch (Exception e) {
 					errorCount.incrementAndGet();
-					logger.error("[MethodID: {}][TaskID: {}] Failed to process task: {}",
-							methodId, taskId, e.getMessage(), e);
+					lambdaLogger.log(String.format("[MethodID: %s][TaskID: %s] Failed to process task: %s",
+							methodId, taskId, e.getMessage()));
 				}
 			});
 
-			logger.info("[MethodID: {}] Expired tasks processing completed. Statistics:\n" +
-							"- Total tasks: {}\n" +
-							"- Successfully processed: {}\n" +
-							"- Errors encountered: {}",
-					methodId, totalTasks, processedCount.get(), errorCount.get());
+			lambdaLogger.log(String.format("[MethodID: %s] Expired tasks processing completed. Statistics:\n" +
+							"- Total tasks: %d\n" +
+							"- Successfully processed: %d\n" +
+							"- Errors encountered: %d",
+					methodId, totalTasks, processedCount.get(), errorCount.get()));
 
 		} catch (Exception e) {
-			logger.error("[MethodID: {}] Critical error during expired tasks processing: {}",
-					methodId, e.getMessage(), e);
-			logger.error("[MethodID: {}] Stack trace: ", methodId, e);
+			lambdaLogger.log(String.format("[MethodID: %s] Critical error during expired tasks processing: %s",
+					methodId, e.getMessage()));
 			throw new RuntimeException("Expired tasks processing failed", e);
 		}
 	}

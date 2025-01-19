@@ -132,6 +132,7 @@ public class NotificationService {
 				}
 			}
 		}
+
 	}
 
 	public void notifyAdminOfStatusChange(Task task, String status, String snsTopicArn) {
@@ -292,6 +293,64 @@ public class NotificationService {
 		}
 	}
 
+	public void notifyTaskExpiration(Task task, String snsTopicArn) {
+		try {
+			log.info("Preparing expiration notification for task: {}, previously assigned to: {}",
+					task.getId(), task.getAssignedUserId());
+
+			// Create message attributes
+			Map<String, software.amazon.awssdk.services.sns.model.MessageAttributeValue> messageAttributes = new HashMap<>();
+
+			// Add assigned user attribute for filtering
+			messageAttributes.put("assignedUserId", software.amazon.awssdk.services.sns.model.MessageAttributeValue.builder()
+					.dataType("String")
+					.stringValue(task.getAssignedUserId())
+					.build());
+
+			// Add notification type
+			messageAttributes.put("notificationType", software.amazon.awssdk.services.sns.model.MessageAttributeValue.builder()
+					.dataType("String")
+					.stringValue("TASK_EXPIRATION")
+					.build());
+
+			// Add messageType for admin filtering
+			messageAttributes.put("messageType", software.amazon.awssdk.services.sns.model.MessageAttributeValue.builder()
+					.dataType("String")
+					.stringValue("ALL")
+					.build());
+
+			// Create detailed notification message
+			String message = String.format(
+					"Task Expiration Notice\n" +
+							"Task ID: %s\n" +
+							"Task Name: %s\n" +
+							"Description: %s\n" +
+							"Deadline: %s\n" +
+							"Assigned User: %s\n" +
+							"Status: EXPIRED\n\n" +
+							"The task has passed its deadline without completion.",
+					task.getId(),
+					task.getName(),
+					task.getDescription(),
+					task.getDeadline(),
+					task.getAssignedUserId());
+
+			// Send notification
+			PublishRequest publishRequest = PublishRequest.builder()
+					.topicArn(snsTopicArn)
+					.message(message)
+					.messageAttributes(messageAttributes)
+					.build();
+
+			snsClient.publish(publishRequest);
+			log.info("Successfully sent expiration notification for task: {}", task.getId());
+
+		} catch (SnsException e) {
+			log.error("Failed to send expiration notification for task: {}, error: {}",
+					task.getId(), e.getMessage());
+			throw new RuntimeException("Failed to send expiration notification", e);
+		}
+	}
 
 
 	public void sendToExpiredTasksQueue(String messageBody, String queueUrl) {

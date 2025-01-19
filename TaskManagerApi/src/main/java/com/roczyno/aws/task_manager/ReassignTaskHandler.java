@@ -47,7 +47,6 @@ public class ReassignTaskHandler implements RequestHandler<APIGatewayProxyReques
 			}
 
 			NotificationService notificationService = new NotificationService(
-					AwsConfig.sesClient(),
 					AwsConfig.sqsClient(),
 					AwsConfig.objectMapper(),
 					AwsConfig.snsClient()

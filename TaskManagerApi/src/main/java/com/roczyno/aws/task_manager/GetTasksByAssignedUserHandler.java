@@ -7,8 +7,6 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyRequestEvent;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import com.roczyno.aws.task_manager.config.AwsConfig;
 import com.roczyno.aws.task_manager.model.LocalDateTimeAdapter;
 import com.roczyno.aws.task_manager.model.Task;
@@ -36,7 +34,6 @@ public class GetTasksByAssignedUserHandler implements RequestHandler<APIGatewayP
 
 	public GetTasksByAssignedUserHandler() {
 		this.taskService = new TaskService(AwsConfig.dynamoDbClient(), new NotificationService(
-				AwsConfig.sesClient(),
 				AwsConfig.sqsClient(),
 				AwsConfig.objectMapper(),
 				AwsConfig.snsClient()

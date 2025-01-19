@@ -30,7 +30,6 @@ public class LoginUserHandler implements RequestHandler<APIGatewayProxyRequestEv
 
 	public LoginUserHandler(){
 		NotificationService notificationService = new NotificationService(
-				AwsConfig.sesClient(),
 				AwsConfig.sqsClient(),
 				AwsConfig.objectMapper(),
 				AwsConfig.snsClient()

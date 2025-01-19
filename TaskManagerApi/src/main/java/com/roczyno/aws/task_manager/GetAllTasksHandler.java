@@ -36,7 +36,6 @@ public class GetAllTasksHandler implements RequestHandler<APIGatewayProxyRequest
 	public GetAllTasksHandler() {
 		try {
 			NotificationService notificationService = new NotificationService(
-					AwsConfig.sesClient(),
 					AwsConfig.sqsClient(),
 					AwsConfig.objectMapper(),
 					AwsConfig.snsClient()

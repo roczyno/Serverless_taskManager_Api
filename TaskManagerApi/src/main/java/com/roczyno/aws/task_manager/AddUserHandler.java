@@ -33,7 +33,6 @@ public class AddUserHandler implements RequestHandler<APIGatewayProxyRequestEven
 	public AddUserHandler() {
 		// Create NotificationService with dependencies from AwsConfig
 		NotificationService notificationService = new NotificationService(
-				AwsConfig.sesClient(),
 				AwsConfig.sqsClient(),
 				AwsConfig.objectMapper(),
 				AwsConfig.snsClient()

@@ -45,7 +45,6 @@ public class ReopenTaskHandler implements RequestHandler<APIGatewayProxyRequestE
 			}
 
 			NotificationService notificationService = new NotificationService(
-					AwsConfig.sesClient(),
 					AwsConfig.sqsClient(),
 					AwsConfig.objectMapper(),
 					AwsConfig.snsClient()

@@ -11,8 +11,6 @@ FTaskManagerApi/src/test/java/com/roczyno/aws/task_manager/AppTest.java,3\d\3d1
 YTaskManagerApi/src/main/java/com/roczyno/aws/task_manager/service/CognitoUserService.java,1\7\1776926e0f3e6e0944d0f49e6a0072c0a0a85c0b
 =
 template.yaml,a\5\a59ab7db7e728017a7f55483d5aa97d97a4f9a87
-Å
-QTaskManagerApi/src/main/java/com/roczyno/aws/task_manager/ConfirmUserHandler.java,1\b\1b251ebec1bd662ebfaff853ddb4d74abbdb9af3
 t
 DTaskManagerApi/src/main/java/com/roczyno/aws/task_manager/Utils.java,7\1\71b6e0a174cec64c6c1d08ffdb5c1da6989ce7fa
 
@@ -22,8 +20,6 @@ OTaskManagerApi/src/main/java/com/roczyno/aws/task_manager/LoginUserHandler.java
 .gitignore,a\5\a5cc2925ca8258af241be7e5b0381edf30266302
 |
 LTaskManagerApi/src/main/java/com/roczyno/aws/task_manager/ErrorResponse.java,0\3\03eac4c57ded2d7ade043357e2251dad3e583c39
-}
-MTaskManagerApi/src/main/java/com/roczyno/aws/task_manager/GetUserHandler.java,3\f\3f21fad832f42b531d57f26ace09c5e8f24dd946
 ä
 ZTaskManagerApi/src/main/java/com/roczyno/aws/task_manager/authorizer/AuthorizerOutput.java,d\7\d7d2de33eed03843ff1fa38676437375e1cf6108
 ä
@@ -32,8 +28,6 @@ ZTaskManagerApi/src/main/java/com/roczyno/aws/task_manager/authorizer/LambdaAuth
 XTaskManagerApi/src/main/java/com/roczyno/aws/task_manager/authorizer/PolicyDocument.java,b\c\bc0ca5d0083a791324ce2f0791413d477dd44448
 É
 STaskManagerApi/src/main/java/com/roczyno/aws/task_manager/authorizer/Statement.java,0\9\09e93c3e6b6c98dcff483dfeff064be3d18e77e7
-Ç
-RTaskManagerApi/src/main/java/com/roczyno/aws/task_manager/RegisterUserHandler.java,6\1\61b4e87cd296e1032e23be65c0e34da3a610654b
 }
 MTaskManagerApi/src/main/java/com/roczyno/aws/task_manager/AddUserHandler.java,b\5\b57de8ba6ec6d8285585a8b569b04b251ec55cae
 y

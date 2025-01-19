@@ -36,7 +36,6 @@ public class CreateTaskHandler implements RequestHandler<APIGatewayProxyRequestE
 
 	public CreateTaskHandler() {
 		NotificationService notificationService = new NotificationService(
-				AwsConfig.sesClient(),
 				AwsConfig.sqsClient(),
 				AwsConfig.objectMapper(),
 				AwsConfig.snsClient()
