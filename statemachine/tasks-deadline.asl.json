@@ -28,19 +28,8 @@
       "Type": "Task",
       "Resource": "arn:aws:states:::sns:publish",
       "Parameters": {
-        "TopicArn": "${ClosedTasksNotificationTopic}",
-        "Message": {
-          "Fn::Join": [
-            "",
-            [
-              "Task has expired:\n",
-              "Task Name: ", {"Ref": "taskName"}, "\n",
-              "Deadline: ", {"Ref": "deadline"}, "\n",
-              "Assigned User: ", {"Ref": "assignedUserId"}, "\n",
-              "\nThis notification has been sent to both the assigned user and administrators."
-            ]
-          ]
-        }
+        "TopicArn.$": "$.snsTopicArn",
+        "Message.$": "States.Format('Task has expired:\nTask Name: {}\nDeadline: {}\nAssigned User: {}\n\nThis notification has been sent to both the assigned user and administrators.', $.taskName, $.deadline, $.assignedUserId)"
       },
       "End": true
     }
