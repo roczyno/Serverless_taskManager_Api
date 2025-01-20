@@ -343,8 +343,21 @@ Resources:
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref TasksTable
+        # Permission for TasksDeadlineNotificationTopic
         - SNSPublishMessagePolicy:
             TopicName: !GetAtt TasksDeadlineNotificationTopic.TopicName
+        # Permission for ClosedTasksNotificationTopic
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt ClosedTasksNotificationTopic.TopicName
+        # Explicit ARN permissions for both topics
+        - Statement:
+            - Effect: Allow
+              Action:
+                - sns:Publish
+              Resource:
+                - !Ref TasksDeadlineNotificationTopic
+                - !Ref ClosedTasksNotificationTopic
+        # CloudWatch Logs permissions
         - Statement:
             - Effect: Allow
               Action:

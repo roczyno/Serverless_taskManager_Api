@@ -22,6 +22,7 @@
           }
         }
       },
+      "ResultPath": "$.dynamodbResult",
       "Next": "SendNotification"
     },
     "SendNotification": {
@@ -29,7 +30,7 @@
       "Resource": "arn:aws:states:::sns:publish",
       "Parameters": {
         "TopicArn.$": "$.snsTopicArn",
-        "Message.$": "States.Format('Task has expired:\nTask Name: {}\nDeadline: {}\nAssigned User: {}\n\nThis notification has been sent to both the assigned user and administrators.', $.taskName, $.deadline, $.assignedUserId)"
+        "Message.$": "States.Format('Task has expired:\nTask Name: {}\nDeadline: {}\nAssigned User: {}', $.taskName, $.deadline, $.assignedUserId)"
       },
       "End": true
     }
