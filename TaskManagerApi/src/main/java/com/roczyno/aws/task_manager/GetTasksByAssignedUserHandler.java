@@ -35,7 +35,6 @@ public class GetTasksByAssignedUserHandler implements RequestHandler<APIGatewayP
 	public GetTasksByAssignedUserHandler() {
 		this.taskService = new TaskService(AwsConfig.dynamoDbClient(), new NotificationService(
 				AwsConfig.sqsClient(),
-				AwsConfig.objectMapper(),
 				AwsConfig.snsClient()
 		),AwsConfig.objectMapper(),AwsConfig.sfnClient());
 		this.tableName = System.getenv("TASKS_TABLE_NAME");
@@ -64,10 +63,10 @@ public class GetTasksByAssignedUserHandler implements RequestHandler<APIGatewayP
 			String userId = params.get("userId");
 			logger.log("Retrieving tasks for user: " + userId);
 
-			// Get tasks for the user
+
 			List<Task> tasks = taskService.getTasksByAssignedUser(userId, tableName);
 
-			// Convert tasks to JSON
+
 			Gson gson = new GsonBuilder()
 					.registerTypeAdapter(LocalDateTime.class, new LocalDateTimeAdapter())
 					.create();

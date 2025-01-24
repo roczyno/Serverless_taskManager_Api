@@ -24,11 +24,12 @@ public class GetAllUsersHandler implements RequestHandler<APIGatewayProxyRequest
 	public GetAllUsersHandler() {
 		NotificationService notificationService = new NotificationService(
 				AwsConfig.sqsClient(),
-				AwsConfig.objectMapper(),
 				AwsConfig.snsClient()
 
 		);
-		this.cognitoUserService=new CognitoUserService(System.getenv("AWS_REGION"),notificationService);
+		this.cognitoUserService=new CognitoUserService(System.getenv("AWS_REGION"),
+				AwsConfig.cognitoIdentityProviderClient()
+				,notificationService);
 		this.userPoolId = System.getenv("USER_POOL_ID");
 	}
 
@@ -48,7 +49,7 @@ public class GetAllUsersHandler implements RequestHandler<APIGatewayProxyRequest
 
 		try {
 
-			// Get all users
+
 			logger.log("Getting users from user pool: " + userPoolId);
 			JsonObject allUsers = cognitoUserService.getAllUsers(userPoolId);
 			logger.log("Users retrieved successfully");

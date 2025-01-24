@@ -1,0 +1,960 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'TaskManagerApi
+
+  Sample SAM Template for TaskManagerApi
+
+  '
+Parameters:
+  Stage:
+    Type: String
+    Default: dev
+    AllowedValues:
+    - dev
+    - prod
+    Description: Stage name for deployment
+Globals:
+  Function:
+    Timeout: 20
+    Runtime: java17
+    Architectures:
+    - x86_64
+    MemorySize: 512
+    Environment:
+      Variables:
+        STAGE:
+          Ref: Stage
+        TM_COGNITO_POOL_CLIENT_ID:
+          Ref: TaskManagerUserPoolClient
+        TM_COGNITO_POOL_SECRET_ID:
+          Fn::GetAtt:
+          - TaskManagerUserPoolClient
+          - ClientSecret
+        TM_COGNITO_USER_POOL_ID:
+          Ref: TaskManagerUserPool
+        ASSIGNMENT_TOPIC_ARN:
+          Ref: TasksAssignmentNotificationTopic
+        DEADLINE_TOPIC_ARN:
+          Ref: TasksDeadlineNotificationTopic
+        CLOSED_TOPIC_ARN:
+          Ref: ClosedTasksNotificationTopic
+        REOPENED_TOPIC_ARN:
+          Ref: ReopenedTasksNotificationTopic
+        COMPLETE_TOPIC_ARN:
+          Ref: TaskCompleteNotificationTopic
+Conditions:
+  IsProd:
+    Fn::Equals:
+    - Ref: Stage
+    - prod
+  IsDev:
+    Fn::Equals:
+    - Ref: Stage
+    - dev
+Resources:
+  TaskManagerUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName:
+        Fn::Sub: TaskManagerUserPool-${Stage}
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+        - Name: verified_email
+          Priority: 1
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true
+      AutoVerifiedAttributes:
+      - email
+      EmailConfiguration:
+        EmailSendingAccount: COGNITO_DEFAULT
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          RequireUppercase: true
+      Schema:
+      - Name: email
+        AttributeDataType: String
+        Mutable: true
+        Required: true
+      - Name: name
+        AttributeDataType: String
+        Mutable: true
+        Required: true
+      - Name: userId
+        AttributeDataType: String
+        Mutable: true
+        Required: false
+      - Name: role
+        AttributeDataType: String
+        Mutable: true
+        Required: false
+      UsernameAttributes:
+      - email
+      UsernameConfiguration:
+        CaseSensitive: false
+  TaskManagerUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId:
+        Ref: TaskManagerUserPool
+      ClientName:
+        Fn::Sub: TaskManagerClient-${Stage}
+      GenerateSecret: true
+      ExplicitAuthFlows:
+      - ALLOW_USER_PASSWORD_AUTH
+      - ALLOW_ADMIN_USER_PASSWORD_AUTH
+      - ALLOW_USER_SRP_AUTH
+      - ALLOW_REFRESH_TOKEN_AUTH
+      PreventUserExistenceErrors: ENABLED
+      AllowedOAuthFlows:
+      - code
+      AllowedOAuthScopes:
+      - email
+      - openid
+      - profile
+      AllowedOAuthFlowsUserPoolClient: true
+      CallbackURLs:
+      - http://localhost:5173
+      SupportedIdentityProviders:
+      - COGNITO
+  TaskManagerUserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      Domain:
+        Fn::Sub: taskmanager-${Stage}-${AWS::AccountId}
+      UserPoolId:
+        Ref: TaskManagerUserPool
+  AdminGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: ADMIN
+      UserPoolId:
+        Ref: TaskManagerUserPool
+      Description: Administrator group
+      Precedence: 1
+  UserGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: USER
+      UserPoolId:
+        Ref: TaskManagerUserPool
+      Description: Regular user group
+      Precedence: 2
+  MyApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName:
+        Ref: Stage
+      Auth:
+        DefaultAuthorizer: CognitoAuthorizer
+        Authorizers:
+          CognitoAuthorizer:
+            UserPoolArn:
+              Fn::GetAtt:
+              - TaskManagerUserPool
+              - Arn
+        AddDefaultAuthorizerToCorsPreflight: false
+      Cors:
+        AllowMethods: '''GET,POST,PUT,DELETE,OPTIONS'''
+        AllowHeaders: '''Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Requested-With'''
+        AllowOrigin: '''*'''
+        MaxAge: '''3600'''
+      Variables:
+        Stage:
+          Ref: Stage
+  LoginUserHandlerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: LoginUserHandlerFunction
+      Handler: com.roczyno.aws.task_manager.LoginUserHandler::handleRequest
+      Events:
+        LoginUser:
+          Type: Api
+          Properties:
+            Path: /login
+            Method: post
+            RestApiId:
+              Ref: MyApi
+            Auth:
+              Authorizer: NONE
+    Metadata:
+      SamResourceId: LoginUserHandlerFunction
+  AddUserHandlerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: AddUserHandlerFunction
+      Handler: com.roczyno.aws.task_manager.AddUserHandler::handleRequest
+      Environment:
+        Variables:
+          USER_ONBOARDING_STATE_MACHINE_ARN:
+            Fn::GetAtt:
+            - UserOnboardingStateMachine
+            - Arn
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - cognito-idp:AdminCreateUser
+          - cognito-idp:AdminAddUserToGroup
+          - cognito-idp:AdminSetUserPassword
+          - cognito-idp:UpdateUserPool
+          Resource:
+            Fn::GetAtt:
+            - TaskManagerUserPool
+            - Arn
+        - Effect: Allow
+          Action:
+          - ses:SendEmail
+          - ses:SendRawEmail
+          Resource: '*'
+        - Effect: Allow
+          Action:
+          - states:StartExecution
+          Resource:
+            Fn::GetAtt:
+            - UserOnboardingStateMachine
+            - Arn
+        - Effect: Allow
+          Action:
+          - logs:CreateLogGroup
+          - logs:CreateLogStream
+          - logs:PutLogEvents
+          Resource:
+          - Fn::Sub: arn:aws:logs:eu-west-1:${AWS::AccountId}:log-group:/aws/lambda/*
+      Events:
+        AddUser:
+          Type: Api
+          Properties:
+            Path: /users
+            Method: post
+            RestApiId:
+              Ref: MyApi
+            Auth:
+              Authorizer: CognitoAuthorizer
+    Metadata:
+      SamResourceId: AddUserHandlerFunction
+  GetAllUsersHandlerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: GetAllUsersHandlerFunction
+      Handler: com.roczyno.aws.task_manager.GetAllUsersHandler::handleRequest
+      Environment:
+        Variables:
+          USER_POOL_ID:
+            Ref: TaskManagerUserPool
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - cognito-idp:ListUsers
+          Resource:
+            Fn::GetAtt:
+            - TaskManagerUserPool
+            - Arn
+        - Effect: Allow
+          Action:
+          - ses:SendEmail
+          - ses:SendRawEmail
+          Resource: '*'
+        - Effect: Allow
+          Action:
+          - logs:CreateLogGroup
+          - logs:CreateLogStream
+          - logs:PutLogEvents
+          Resource:
+          - Fn::Sub: arn:aws:logs:eu-west-1:${AWS::AccountId}:log-group:/aws/lambda/*
+      Events:
+        GetAllUsers:
+          Type: Api
+          Properties:
+            Path: /users
+            Method: get
+            RestApiId:
+              Ref: MyApi
+            Auth:
+              Authorizer: CognitoAuthorizer
+    Metadata:
+      SamResourceId: GetAllUsersHandlerFunction
+  TaskCompleteNotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName:
+        Fn::Sub: TaskCompleteNotificationTopic-${Stage}
+      DisplayName:
+        Fn::Sub: Task Complete Notifications ${Stage}
+  TasksAssignmentNotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName:
+        Fn::Sub: TasksAssignmentNotificationTopic-${Stage}
+      DisplayName:
+        Fn::Sub: Tasks Assignment Notifications ${Stage}
+  TasksDeadlineNotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName:
+        Fn::Sub: TasksDeadlineNotificationTopic-${Stage}
+      DisplayName:
+        Fn::Sub: Tasks Deadline Notifications-${Stage}
+  ClosedTasksNotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName:
+        Fn::Sub: ClosedTasksNotificationTopic-${Stage}
+      DisplayName:
+        Fn::Sub: Closed Tasks Notifications-${Stage}
+  ReopenedTasksNotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName:
+        Fn::Sub: ReopenedTasksNotificationTopic-${Stage}
+      DisplayName:
+        Fn::Sub: Reopened Tasks Notifications-${Stage}
+  SNSSubscriptionFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: SNSSubscriptionFunction
+      Handler: com.roczyno.aws.task_manager.SNSSubscriptionHandler::handleRequest
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - sns:Subscribe
+          - sns:Unsubscribe
+          - sns:ListSubscriptionsByTopic
+          Resource:
+          - Ref: TasksAssignmentNotificationTopic
+          - Ref: TasksDeadlineNotificationTopic
+          - Ref: ClosedTasksNotificationTopic
+          - Ref: ReopenedTasksNotificationTopic
+          - Ref: TaskCompleteNotificationTopic
+        - Effect: Allow
+          Action:
+          - logs:CreateLogGroup
+          - logs:CreateLogStream
+          - logs:PutLogEvents
+          Resource:
+          - Fn::Sub: arn:aws:logs:eu-west-1:${AWS::AccountId}:log-group:/aws/lambda/*
+    Metadata:
+      SamResourceId: SNSSubscriptionFunction
+  UserOnboardingStateMachine:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      DefinitionUri: ../../statemachine/user-onboarding.asl.json
+      DefinitionSubstitutions:
+        SNSSubscriptionFunctionArn:
+          Fn::GetAtt:
+          - SNSSubscriptionFunction
+          - Arn
+      Type: STANDARD
+      Policies:
+      - LambdaInvokePolicy:
+          FunctionName:
+            Ref: SNSSubscriptionFunction
+      - Statement:
+        - Effect: Allow
+          Action:
+          - sns:Subscribe
+          - sns:Unsubscribe
+          - sns:ListSubscriptionsByTopic
+          Resource:
+          - Ref: TasksAssignmentNotificationTopic
+          - Ref: TasksDeadlineNotificationTopic
+          - Ref: ClosedTasksNotificationTopic
+          - Ref: ReopenedTasksNotificationTopic
+          - Ref: TaskCompleteNotificationTopic
+        - Effect: Allow
+          Action:
+          - logs:CreateLogGroup
+          - logs:CreateLogStream
+          - logs:PutLogEvents
+          Resource:
+          - Fn::Sub: arn:aws:logs:eu-west-1:${AWS::AccountId}:log-group:/aws/lambda/*
+  TaskDeadlineStateMachine:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      DefinitionUri: ../../statemachine/tasks-deadline.asl.json
+      DefinitionSubstitutions:
+        TasksTable:
+          Ref: TasksTable
+        TasksDeadlineNotificationTopic:
+          Ref: TasksDeadlineNotificationTopic
+      Type: STANDARD
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName:
+            Ref: TasksTable
+      - SNSPublishMessagePolicy:
+          TopicName:
+            Fn::GetAtt:
+            - TasksDeadlineNotificationTopic
+            - TopicName
+      - SNSPublishMessagePolicy:
+          TopicName:
+            Fn::GetAtt:
+            - ClosedTasksNotificationTopic
+            - TopicName
+      - Statement:
+        - Effect: Allow
+          Action:
+          - sns:Publish
+          Resource:
+          - Ref: TasksDeadlineNotificationTopic
+          - Ref: ClosedTasksNotificationTopic
+      - Statement:
+        - Effect: Allow
+          Action:
+          - logs:CreateLogGroup
+          - logs:CreateLogStream
+          - logs:PutLogEvents
+          Resource:
+          - Fn::Sub: arn:aws:logs:eu-west-1:${AWS::AccountId}:log-group:/aws/lambda/*
+  TasksQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName:
+        Fn::Sub: TasksQueue-${Stage}
+  ExpiredTasksQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName:
+        Fn::Sub: ExpiredTasksQueue-${Stage}
+      VisibilityTimeout: 300
+      MessageRetentionPeriod: 1209600
+      RedrivePolicy:
+        deadLetterTargetArn:
+          Fn::GetAtt:
+          - ExpiredTasksDLQ
+          - Arn
+        maxReceiveCount: 3
+  ExpiredTasksDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName:
+        Fn::Sub: ExpiredTasksDLQ-${Stage}
+      MessageRetentionPeriod: 1209600
+  TasksTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName:
+        Fn::Sub: TasksTable-${Stage}
+      AttributeDefinitions:
+      - AttributeName: id
+        AttributeType: S
+      - AttributeName: assignedUserId
+        AttributeType: S
+      - AttributeName: status
+        AttributeType: S
+      - AttributeName: deadline
+        AttributeType: S
+      KeySchema:
+      - AttributeName: id
+        KeyType: HASH
+      GlobalSecondaryIndexes:
+      - IndexName: AssignedUserIdIndex
+        KeySchema:
+        - AttributeName: assignedUserId
+          KeyType: HASH
+        Projection:
+          ProjectionType: ALL
+      - IndexName: StatusDeadlineIndex
+        KeySchema:
+        - AttributeName: status
+          KeyType: HASH
+        - AttributeName: deadline
+          KeyType: RANGE
+        Projection:
+          ProjectionType: ALL
+      BillingMode: PAY_PER_REQUEST
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+  CreateTaskFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: CreateTaskFunction
+      Handler: com.roczyno.aws.task_manager.CreateTaskHandler::handleRequest
+      Environment:
+        Variables:
+          STAGE:
+            Ref: Stage
+          TASKS_TABLE_NAME:
+            Ref: TasksTable
+          TASKS_QUEUE_URL:
+            Ref: TasksQueue
+          ASSIGNMENT_TOPIC_ARN:
+            Ref: TasksAssignmentNotificationTopic
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - dynamodb:PutItem
+          - dynamodb:GetItem
+          - dynamodb:UpdateItem
+          - dynamodb:DeleteItem
+          - dynamodb:Query
+          - dynamodb:Scan
+          Resource:
+          - Fn::GetAtt:
+            - TasksTable
+            - Arn
+          - Fn::Sub: ${TasksTable.Arn}/index/*
+        - Effect: Allow
+          Action:
+          - sqs:SendMessage
+          - sqs:GetQueueUrl
+          - sqs:GetQueueAttributes
+          Resource:
+            Fn::GetAtt:
+            - TasksQueue
+            - Arn
+        - Effect: Allow
+          Action:
+          - sns:Publish
+          Resource:
+            Ref: TasksAssignmentNotificationTopic
+        - Effect: Allow
+          Action:
+          - logs:CreateLogGroup
+          - logs:CreateLogStream
+          - logs:PutLogEvents
+          Resource:
+          - Fn::Sub: arn:aws:logs:eu-west-1:${AWS::AccountId}:log-group:/aws/lambda/*
+      Events:
+        CreateTask:
+          Type: Api
+          Properties:
+            Path: /tasks
+            Method: post
+            RestApiId:
+              Ref: MyApi
+            Auth:
+              Authorizer: CognitoAuthorizer
+    Metadata:
+      SamResourceId: CreateTaskFunction
+  UpdateTaskStatusFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: UpdateTaskStatusFunction
+      Handler: com.roczyno.aws.task_manager.UpdateTaskStatusHandler::handleRequest
+      Environment:
+        Variables:
+          STAGE:
+            Ref: Stage
+          TASKS_TABLE_NAME:
+            Ref: TasksTable
+          COMPLETE_TOPIC_ARN:
+            Ref: TaskCompleteNotificationTopic
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - dynamodb:GetItem
+          - dynamodb:UpdateItem
+          Resource:
+          - Fn::GetAtt:
+            - TasksTable
+            - Arn
+          - Fn::Sub: ${TasksTable.Arn}/index/*
+        - Effect: Allow
+          Action:
+          - sns:Publish
+          - logs:CreateLogGroup
+          - logs:CreateLogStream
+          - logs:PutLogEvents
+          Resource: '*'
+        - Effect: Allow
+          Action:
+          - sqs:SendMessage
+          Resource:
+            Fn::GetAtt:
+            - TasksQueue
+            - Arn
+        - Effect: Allow
+          Action:
+          - sns:Publish
+          Resource:
+            Ref: TasksAssignmentNotificationTopic
+      Events:
+        UpdateTaskStatus:
+          Type: Api
+          Properties:
+            Path: /tasks/status
+            Method: put
+            RestApiId:
+              Ref: MyApi
+            Auth:
+              Authorizer: CognitoAuthorizer
+    Metadata:
+      SamResourceId: UpdateTaskStatusFunction
+  ReopenTaskFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ReopenTaskFunction
+      Handler: com.roczyno.aws.task_manager.ReopenTaskHandler::handleRequest
+      Environment:
+        Variables:
+          STAGE:
+            Ref: Stage
+          TASKS_TABLE_NAME:
+            Ref: TasksTable
+          REOPENED_TOPIC_ARN:
+            Ref: ReopenedTasksNotificationTopic
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - dynamodb:GetItem
+          - dynamodb:UpdateItem
+          Resource:
+          - Fn::GetAtt:
+            - TasksTable
+            - Arn
+          - Fn::Sub: ${TasksTable.Arn}/index/*
+        - Effect: Allow
+          Action:
+          - sns:Publish
+          - logs:CreateLogGroup
+          - logs:CreateLogStream
+          - logs:PutLogEvents
+          Resource: '*'
+        - Effect: Allow
+          Action:
+          - sqs:SendMessage
+          Resource:
+            Fn::GetAtt:
+            - TasksQueue
+            - Arn
+        - Effect: Allow
+          Action:
+          - sns:Publish
+          Resource:
+            Ref: TasksAssignmentNotificationTopic
+      Events:
+        ReopenTask:
+          Type: Api
+          Properties:
+            Path: /tasks/reopen
+            Method: post
+            RestApiId:
+              Ref: MyApi
+            Auth:
+              Authorizer: CognitoAuthorizer
+    Metadata:
+      SamResourceId: ReopenTaskFunction
+  ReassignTaskFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ReassignTaskFunction
+      Handler: com.roczyno.aws.task_manager.ReassignTaskHandler::handleRequest
+      Environment:
+        Variables:
+          STAGE:
+            Ref: Stage
+          TASKS_QUEUE_URL:
+            Ref: TasksQueue
+          TASKS_TABLE_NAME:
+            Ref: TasksTable
+          ASSIGNMENT_TOPIC_ARN:
+            Ref: TasksAssignmentNotificationTopic
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - dynamodb:GetItem
+          - dynamodb:UpdateItem
+          Resource:
+          - Fn::GetAtt:
+            - TasksTable
+            - Arn
+          - Fn::Sub: ${TasksTable.Arn}/index/*
+        - Effect: Allow
+          Action:
+          - sns:Publish
+          - logs:CreateLogGroup
+          - logs:CreateLogStream
+          - logs:PutLogEvents
+          Resource: '*'
+        - Effect: Allow
+          Action:
+          - sqs:SendMessage
+          Resource:
+            Fn::GetAtt:
+            - TasksQueue
+            - Arn
+        - Effect: Allow
+          Action:
+          - sns:Publish
+          Resource:
+            Ref: TasksAssignmentNotificationTopic
+      Events:
+        ReassignTask:
+          Type: Api
+          Properties:
+            Path: /tasks/reassign
+            Method: put
+            RestApiId:
+              Ref: MyApi
+            Auth:
+              Authorizer: CognitoAuthorizer
+    Metadata:
+      SamResourceId: ReassignTaskFunction
+  GetAllTasksHandlerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: GetAllTasksHandlerFunction
+      Handler: com.roczyno.aws.task_manager.GetAllTasksHandler::handleRequest
+      Environment:
+        Variables:
+          STAGE:
+            Ref: Stage
+          TASKS_TABLE_NAME:
+            Ref: TasksTable
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - dynamodb:Scan
+          - dynamodb:DescribeTable
+          Resource:
+            Fn::GetAtt:
+            - TasksTable
+            - Arn
+        - Effect: Allow
+          Action:
+          - logs:CreateLogGroup
+          - logs:CreateLogStream
+          - logs:PutLogEvents
+          Resource:
+          - Fn::Sub: arn:aws:logs:eu-west-1:${AWS::AccountId}:log-group:/aws/lambda/*
+      Events:
+        GetAllTasks:
+          Type: Api
+          Properties:
+            Path: /tasks
+            Method: get
+            RestApiId:
+              Ref: MyApi
+            Auth:
+              Authorizer: CognitoAuthorizer
+    Metadata:
+      SamResourceId: GetAllTasksHandlerFunction
+  GetTasksByAssignedUserHandlerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: GetTasksByAssignedUserHandlerFunction
+      Handler: com.roczyno.aws.task_manager.GetTasksByAssignedUserHandler::handleRequest
+      Environment:
+        Variables:
+          STAGE:
+            Ref: Stage
+          TASKS_TABLE_NAME:
+            Ref: TasksTable
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - dynamodb:Query
+          Resource:
+          - Fn::GetAtt:
+            - TasksTable
+            - Arn
+          - Fn::Sub: ${TasksTable.Arn}/index/*
+        - Effect: Allow
+          Action:
+          - logs:CreateLogGroup
+          - logs:CreateLogStream
+          - logs:PutLogEvents
+          Resource:
+          - Fn::Sub: arn:aws:logs:eu-west-1:${AWS::AccountId}:log-group:/aws/lambda/*
+      Events:
+        GetTasksByAssignedUser:
+          Type: Api
+          Properties:
+            Path: /tasks/user/{userId}
+            Method: get
+            RestApiId:
+              Ref: MyApi
+            Auth:
+              Authorizer: CognitoAuthorizer
+    Metadata:
+      SamResourceId: GetTasksByAssignedUserHandlerFunction
+  DeleteTaskFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: DeleteTaskFunction
+      Handler: com.roczyno.aws.task_manager.DeleteTaskHandler::handleRequest
+      Environment:
+        Variables:
+          STAGE:
+            Ref: Stage
+          TASKS_TABLE_NAME:
+            Ref: TasksTable
+          TASKS_QUEUE_URL:
+            Ref: TasksQueue
+          ASSIGNMENT_TOPIC_ARN:
+            Ref: TasksAssignmentNotificationTopic
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - dynamodb:DeleteItem
+          - dynamodb:GetItem
+          Resource:
+          - Fn::GetAtt:
+            - TasksTable
+            - Arn
+          - Fn::Sub: ${TasksTable.Arn}/index/*
+        - Effect: Allow
+          Action:
+          - sns:Publish
+          Resource:
+            Ref: TasksAssignmentNotificationTopic
+        - Effect: Allow
+          Action:
+          - logs:CreateLogGroup
+          - logs:CreateLogStream
+          - logs:PutLogEvents
+          Resource:
+          - Fn::Sub: arn:aws:logs:eu-west-1:${AWS::AccountId}:log-group:/aws/lambda/*
+      Events:
+        DeleteTask:
+          Type: Api
+          Properties:
+            Path: /tasks/{taskId}
+            Method: delete
+            RestApiId:
+              Ref: MyApi
+            Auth:
+              Authorizer: CognitoAuthorizer
+    Metadata:
+      SamResourceId: DeleteTaskFunction
+  DeadlineCheckerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: DeadlineCheckerFunction
+      Handler: com.roczyno.aws.task_manager.DeadlineCheckerHandler::handleRequest
+      Environment:
+        Variables:
+          STAGE:
+            Ref: Stage
+          TASKS_TABLE_NAME:
+            Ref: TasksTable
+          DEADLINE_TOPIC_ARN:
+            Ref: TasksDeadlineNotificationTopic
+          EXPIRED_TASKS_QUEUE_URL:
+            Ref: ExpiredTasksQueue
+          TASK_DEADLINE_STATE_MACHINE_ARN:
+            Fn::GetAtt:
+            - TaskDeadlineStateMachine
+            - Arn
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - dynamodb:Scan
+          - dynamodb:Query
+          Resource:
+          - Fn::GetAtt:
+            - TasksTable
+            - Arn
+          - Fn::Sub: ${TasksTable.Arn}/index/*
+        - Effect: Allow
+          Action:
+          - sns:Publish
+          Resource:
+            Ref: TasksDeadlineNotificationTopic
+        - Effect: Allow
+          Action:
+          - sqs:SendMessage
+          - sqs:GetQueueUrl
+          - sqs:GetQueueAttributes
+          Resource:
+          - Fn::GetAtt:
+            - ExpiredTasksQueue
+            - Arn
+          - Fn::GetAtt:
+            - ExpiredTasksDLQ
+            - Arn
+        - Effect: Allow
+          Action:
+          - states:StartExecution
+          Resource:
+            Fn::GetAtt:
+            - TaskDeadlineStateMachine
+            - Arn
+        - Effect: Allow
+          Action:
+          - logs:CreateLogGroup
+          - logs:CreateLogStream
+          - logs:PutLogEvents
+          Resource:
+          - Fn::Sub: arn:aws:logs:eu-west-1:${AWS::AccountId}:log-group:/aws/lambda/*
+      Events:
+        ScheduledDeadlineCheck:
+          Type: Schedule
+          Properties:
+            Schedule: rate(15 minutes)
+            Name: TaskDeadlineCheck
+            Description: Checks for tasks with approaching deadlines every 15 minutes
+            Enabled: true
+    Metadata:
+      SamResourceId: DeadlineCheckerFunction
+  DeadlineCheckerAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName:
+        Fn::Sub: ${AWS::StackName}-DeadlineCheckerErrors
+      AlarmDescription: Alert when deadline checker encounters errors
+      MetricName: Errors
+      Namespace: AWS/Lambda
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      Dimensions:
+      - Name: FunctionName
+        Value:
+          Ref: DeadlineCheckerFunction
+Outputs:
+  UserPoolId:
+    Description: ID of the Cognito User Pool
+    Value:
+      Ref: TaskManagerUserPool
+  UserPoolClientId:
+    Description: ID of the Cognito User Pool Client
+    Value:
+      Ref: TaskManagerUserPoolClient
+  UserPoolClientSecret:
+    Description: Secret of the Cognito User Pool Client
+    Value:
+      Fn::GetAtt:
+      - TaskManagerUserPoolClient
+      - ClientSecret
+  ApiEndpoint:
+    Description: API Gateway endpoint URL for Prod stage
+    Value:
+      Fn::Sub: https://${MyApi}.execute-api.${AWS::Region}.amazonaws.com/${Stage}
+  CognitoLoginUrl:
+    Description: Cognito hosted UI login URL
+    Value:
+      Fn::Sub: https://${TaskManagerUserPoolDomain}.auth.${AWS::Region}.amazoncognito.com/login?client_id=${TaskManagerUserPoolClient}&response_type=code&scope=email+openid+profile&redirect_uri=http://localhost:5173
+  CognitoDomain:
+    Description: Cognito User Pool Domain
+    Value:
+      Fn::Sub: https://${TaskManagerUserPoolDomain}.auth.${AWS::Region}.amazoncognito.com

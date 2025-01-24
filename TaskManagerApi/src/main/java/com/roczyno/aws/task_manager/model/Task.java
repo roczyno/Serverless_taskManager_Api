@@ -28,6 +28,7 @@ public class Task {
 	private LocalDateTime completedAt;
 	private String userComment;
 	private String assignedUserId;
+	private String assignedUserName;
 
 	@DynamoDbPartitionKey
 	@DynamoDbAttribute("id")
@@ -96,6 +97,15 @@ public class Task {
 
 	public void setUserComment(String userComment) {
 		this.userComment = userComment;
+	}
+
+	@DynamoDbAttribute("assignedUserName")
+	public String getAssignedUserName() {
+		return assignedUserName;
+	}
+
+	public void setAssignedUserName(String assignedUserName) {
+		this.assignedUserName = assignedUserName;
 	}
 
 	@DynamoDbAttribute("assignedUserId")

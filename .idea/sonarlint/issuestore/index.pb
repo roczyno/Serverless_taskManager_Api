@@ -82,3 +82,5 @@ UTaskManagerApi/src/main/java/com/roczyno/aws/task_manager/model/ExpiredTaskInpu
 UTaskManagerApi/src/main/java/com/roczyno/aws/task_manager/util/AuthorizationUtil.java,c\a\ca14495547ed5047381d2a6489a2e9e4335cd6a1
 €
 PTaskManagerApi/src/main/java/com/roczyno/aws/task_manager/ReopenTaskHandler.java,3\5\35111900c730bf55a5035b19881dc457cc6af683
+‹
+[TaskManagerApi/src/main/java/com/roczyno/aws/task_manager/model/LocalDateTimeConverter.java,9\3\9353dc5d421b7fc11022f5232df6ccfc04e1c133

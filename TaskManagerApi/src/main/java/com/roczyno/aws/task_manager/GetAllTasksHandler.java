@@ -37,7 +37,6 @@ public class GetAllTasksHandler implements RequestHandler<APIGatewayProxyRequest
 		try {
 			NotificationService notificationService = new NotificationService(
 					AwsConfig.sqsClient(),
-					AwsConfig.objectMapper(),
 					AwsConfig.snsClient()
 			);
 			this.taskService = new TaskService(AwsConfig.dynamoDbClient(), notificationService,AwsConfig.objectMapper(),AwsConfig.sfnClient());
@@ -67,7 +66,7 @@ public class GetAllTasksHandler implements RequestHandler<APIGatewayProxyRequest
 			logger.log("Starting getAllTasks request...");
 			logger.log("Using table name: " + tableName);
 
-			// Log AWS credentials status
+
 			logger.log("Checking AWS credentials...");
 			try {
 				DescribeTableRequest describeTableRequest = DescribeTableRequest.builder()

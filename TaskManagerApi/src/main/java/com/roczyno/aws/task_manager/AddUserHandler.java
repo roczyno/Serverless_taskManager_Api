@@ -31,16 +31,16 @@ public class AddUserHandler implements RequestHandler<APIGatewayProxyRequestEven
 
 
 	public AddUserHandler() {
-		// Create NotificationService with dependencies from AwsConfig
+
 		NotificationService notificationService = new NotificationService(
 				AwsConfig.sqsClient(),
-				AwsConfig.objectMapper(),
 				AwsConfig.snsClient()
 
 		);
 
 		this.cognitoUserService = new CognitoUserService(
 				System.getenv("AWS_REGION"),
+				AwsConfig.cognitoIdentityProviderClient(),
 				notificationService
 		);
 		this.userPoolId = System.getenv("TM_COGNITO_USER_POOL_ID");

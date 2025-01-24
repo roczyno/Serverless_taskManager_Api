@@ -35,7 +35,6 @@ public class UpdateTaskStatusHandler implements RequestHandler<APIGatewayProxyRe
 	public UpdateTaskStatusHandler() {
 		NotificationService notificationService = new NotificationService(
 				AwsConfig.sqsClient(),
-				AwsConfig.objectMapper(),
 				AwsConfig.snsClient()
 		);
 		this.taskService = new TaskService(AwsConfig.dynamoDbClient(), notificationService,AwsConfig.objectMapper(),AwsConfig.sfnClient());

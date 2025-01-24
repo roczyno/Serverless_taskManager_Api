@@ -49,11 +49,8 @@ public class CognitoUserService {
 	private final CognitoIdentityProviderClient cognitoIdentityProviderClient;
 	private final NotificationService notificationService;
 
-	public CognitoUserService(String region, NotificationService notificationService){
-		this.cognitoIdentityProviderClient=CognitoIdentityProviderClient.builder()
-				.region(Region.of(region))
-				.build();
-
+	public CognitoUserService(String region, CognitoIdentityProviderClient cognitoIdentityProviderClient, NotificationService notificationService){
+		this.cognitoIdentityProviderClient = cognitoIdentityProviderClient;
 		this.notificationService = notificationService;
 	}
 

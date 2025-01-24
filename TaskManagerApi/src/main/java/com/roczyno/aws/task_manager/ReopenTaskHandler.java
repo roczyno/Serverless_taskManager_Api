@@ -33,7 +33,7 @@ public class ReopenTaskHandler implements RequestHandler<APIGatewayProxyRequestE
 			this.tableName = System.getenv("TASKS_TABLE_NAME");
 			this.snsTopicArn = System.getenv("REOPENED_TOPIC_ARN");
 
-			// Enhanced logging for specific variables
+
 			System.out.println("TASKS_TABLE_NAME value: " + (tableName != null ? tableName : "null"));
 			System.out.println("ASSIGNMENT_TOPIC_ARN value: " + (snsTopicArn != null ? snsTopicArn : "null"));
 
@@ -46,7 +46,6 @@ public class ReopenTaskHandler implements RequestHandler<APIGatewayProxyRequestE
 
 			NotificationService notificationService = new NotificationService(
 					AwsConfig.sqsClient(),
-					AwsConfig.objectMapper(),
 					AwsConfig.snsClient()
 			);
 			this.taskService = new TaskService(AwsConfig.dynamoDbClient(), notificationService, AwsConfig.objectMapper(), AwsConfig.sfnClient());
@@ -66,7 +65,7 @@ public class ReopenTaskHandler implements RequestHandler<APIGatewayProxyRequestE
 				.withHeaders(CORS_HEADERS);
 
 		try {
-			// Check admin authorization
+
 			if (!AuthorizationUtil.isAdmin(input)) {
 				return AuthorizationUtil.forbidden();
 			}

@@ -29,7 +29,6 @@ public class DeleteTaskHandler implements RequestHandler<APIGatewayProxyRequestE
 	public DeleteTaskHandler() {
 		NotificationService notificationService = new NotificationService(
 				AwsConfig.sqsClient(),
-				AwsConfig.objectMapper(),
 				AwsConfig.snsClient()
 		);
 		this.taskService = new TaskService(AwsConfig.dynamoDbClient(), notificationService,AwsConfig.objectMapper(),AwsConfig.sfnClient());
@@ -55,7 +54,7 @@ public class DeleteTaskHandler implements RequestHandler<APIGatewayProxyRequestE
 				.withHeaders(CORS_HEADERS);
 
 		try {
-			// Extract task ID from path parameters
+
 			Map<String, String> pathParameters = input.getPathParameters();
 			if (pathParameters == null || !pathParameters.containsKey("taskId")) {
 				logger.log("ERROR: Missing taskId path parameter");
@@ -70,7 +69,7 @@ public class DeleteTaskHandler implements RequestHandler<APIGatewayProxyRequestE
 						.withBody("{\"error\":\"taskId cannot be empty\"}");
 			}
 
-			// Attempt to delete the task with explicit error handling
+
 			try {
 				taskService.deleteTask(taskId, tableName, snsTopicArn);
 			} catch (ConditionalCheckFailedException e) {

@@ -75,7 +75,6 @@ public class DeadlineCheckerHandler implements RequestHandler<ScheduledEvent, Vo
 		try {
 			NotificationService notificationService = new NotificationService(
 					AwsConfig.sqsClient(),
-					AwsConfig.objectMapper(),
 					AwsConfig.snsClient()
 			);
 			logger.log(String.format("[InitID: %s] Successfully initialized NotificationService", initId));
@@ -226,7 +225,7 @@ public class DeadlineCheckerHandler implements RequestHandler<ScheduledEvent, Vo
 	}
 
 	private LambdaLogger getInitLogger() {
-		// This is a simple implementation for initialization logging
+
 		return new LambdaLogger() {
 			@Override
 			public void log(String message) {

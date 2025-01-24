@@ -31,11 +31,10 @@ public class LoginUserHandler implements RequestHandler<APIGatewayProxyRequestEv
 	public LoginUserHandler(){
 		NotificationService notificationService = new NotificationService(
 				AwsConfig.sqsClient(),
-				AwsConfig.objectMapper(),
 				AwsConfig.snsClient()
 
 		);
-		this.cognitoUserService=new CognitoUserService(System.getenv("AWS_REGION"),notificationService);
+		this.cognitoUserService=new CognitoUserService(System.getenv("AWS_REGION"),AwsConfig.cognitoIdentityProviderClient(),notificationService);
 		this.appClientId=System.getenv("TM_COGNITO_POOL_CLIENT_ID");
 		this.appClientSecret=System.getenv("TM_COGNITO_POOL_SECRET_ID");
 	}

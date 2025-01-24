@@ -11,5 +11,6 @@ public class CreateTaskRequest {
 	private Status status;
 	private LocalDateTime deadline;
 	private String userComment;
+	private String assignedUserName;
 	private String assignedUserId;
 }

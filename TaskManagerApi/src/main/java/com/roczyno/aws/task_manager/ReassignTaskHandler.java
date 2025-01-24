@@ -48,7 +48,6 @@ public class ReassignTaskHandler implements RequestHandler<APIGatewayProxyReques
 
 			NotificationService notificationService = new NotificationService(
 					AwsConfig.sqsClient(),
-					AwsConfig.objectMapper(),
 					AwsConfig.snsClient()
 			);
 			this.taskService = new TaskService(AwsConfig.dynamoDbClient(), notificationService,AwsConfig.objectMapper(),AwsConfig.sfnClient());
@@ -74,7 +73,7 @@ public class ReassignTaskHandler implements RequestHandler<APIGatewayProxyReques
 			logger.log("Starting task reassignment request processing");
 			logger.log("Request body: " + input.getBody());
 
-			// Validate input
+
 			if (input.getBody() == null) {
 				logger.log("ERROR: Request body is null");
 				return response.withStatusCode(400)
@@ -83,7 +82,7 @@ public class ReassignTaskHandler implements RequestHandler<APIGatewayProxyReques
 
 			JsonObject taskRequest = JsonParser.parseString(input.getBody()).getAsJsonObject();
 
-			// Enhanced input validation with detailed logging
+
 			if (!taskRequest.has("taskId") || taskRequest.get("taskId").getAsString().isEmpty()) {
 				logger.log("ERROR: Missing or empty taskId in request");
 				return response.withStatusCode(400)
@@ -98,12 +97,13 @@ public class ReassignTaskHandler implements RequestHandler<APIGatewayProxyReques
 
 			String taskId = taskRequest.get("taskId").getAsString();
 			String newAssigneeUserId = taskRequest.get("newAssigneeUserId").getAsString();
+			String newAssigneeUserName=taskRequest.get("newAssigneeUserName").getAsString();
 
 			logger.log(String.format("Processing reassignment - Task ID: %s, New Assignee: %s", taskId, newAssigneeUserId));
 			logger.log("Using table: " + tableName);
 			logger.log("Using SNS topic: " + snsTopicArn);
 
-			taskService.reassignTask(taskId, newAssigneeUserId, tableName, snsTopicArn);
+			taskService.reassignTask(taskId, newAssigneeUserId,newAssigneeUserName, tableName, snsTopicArn);
 
 			logger.log("Task reassignment completed successfully");
 			return response.withStatusCode(200)

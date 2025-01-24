@@ -37,7 +37,6 @@ public class CreateTaskHandler implements RequestHandler<APIGatewayProxyRequestE
 	public CreateTaskHandler() {
 		NotificationService notificationService = new NotificationService(
 				AwsConfig.sqsClient(),
-				AwsConfig.objectMapper(),
 				AwsConfig.snsClient()
 		);
 		this.taskService = new TaskService(AwsConfig.dynamoDbClient(), notificationService,AwsConfig.objectMapper(),AwsConfig.sfnClient());
@@ -80,7 +79,7 @@ public class CreateTaskHandler implements RequestHandler<APIGatewayProxyRequestE
 						.withBody("{\"error\":\"Invalid JSON format\"}");
 			}
 
-			// Validate required fields with detailed error messages
+
 			Map<String, String> validationErrors = new HashMap<>();
 
 			if (!taskRequest.has("name") || taskRequest.get("name").getAsString().trim().isEmpty()) {
@@ -106,6 +105,7 @@ public class CreateTaskHandler implements RequestHandler<APIGatewayProxyRequestE
 					taskRequest.get("description").getAsString().trim() : "");
 			createTaskRequest.setStatus(Status.OPEN);
 			createTaskRequest.setAssignedUserId(taskRequest.get("assignedUserId").getAsString().trim());
+			createTaskRequest.setAssignedUserName(taskRequest.get("assignedUserName").getAsString().trim());
 
 			try {
 				String deadline = taskRequest.get("deadline").getAsString();
@@ -129,7 +129,7 @@ public class CreateTaskHandler implements RequestHandler<APIGatewayProxyRequestE
 						.withBody("{\"error\":\"DynamoDB table not found\"}");
 			} catch (Exception e) {
 				logger.log("ERROR: Task creation failed: " + e.getMessage());
-				throw e; // Let the outer catch handle unexpected errors
+				throw e;
 			}
 
 			return response.withStatusCode(201)

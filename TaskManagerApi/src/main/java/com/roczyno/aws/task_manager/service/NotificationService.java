@@ -1,14 +1,12 @@
 
 package com.roczyno.aws.task_manager.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.roczyno.aws.task_manager.model.CreateTaskRequest;
 import com.roczyno.aws.task_manager.model.Task;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import software.amazon.awssdk.core.exception.SdkException;
-import software.amazon.awssdk.services.ses.SesClient;
 import software.amazon.awssdk.services.sns.SnsClient;
 import software.amazon.awssdk.services.sns.model.PublishRequest;
 import software.amazon.awssdk.services.sns.model.SnsException;
@@ -16,7 +14,6 @@ import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sqs.model.MessageAttributeValue;
 import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
 
-import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -25,7 +22,6 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class NotificationService {
 	private final SqsClient sqsClient;
-	private final ObjectMapper objectMapper;
 	private final SnsClient snsClient;
 
 
@@ -35,17 +31,18 @@ public class NotificationService {
 			log.info("Preparing to queue task assignment notification for task: {} to user: {}",
 					task.getName(), task.getAssignedUserId());
 
-			// Create notification payload
-			Map<String, Object> notification = new HashMap<>();
-			notification.put("type", "TASK_ASSIGNMENT");
-			notification.put("taskName", task.getName());
-			notification.put("assignedUserId", task.getAssignedUserId());
-			notification.put("deadline", task.getDeadline().toString());
-			notification.put("description", task.getDescription());
-
-			// Serialize notification payload
-			String messageBody = objectMapper.writeValueAsString(notification);
-			log.debug("Serialized notification message body: {}", messageBody);
+			String messageBody = String.format(
+					"Task Assignment Notification\n" +
+							"Task Name: %s\n" +
+							"Description: %s\n" +
+							"Assigned User: %s\n" +
+							"Assigned UserName: %s\n" +
+							"Deadline: %s",
+					task.getName(),
+					task.getDescription(),
+					task.getAssignedUserId(),
+					task.getAssignedUserName(),
+					task.getDeadline());
 
 			// Queue to SQS for backup/retry purposes
 			sendToSQS(sqsQueueUrl, messageBody, task.getAssignedUserId());
@@ -149,6 +146,10 @@ public class NotificationService {
 					.dataType("String")
 					.stringValue("ALL")
 					.build());
+			messageAttributes.put("assignedUserId", software.amazon.awssdk.services.sns.model.MessageAttributeValue.builder()
+					.dataType("String")
+					.stringValue(task.getAssignedUserId())
+					.build());
 
 			String notificationMessage = String.format(
 					"Task Status Change Notification\n" +
@@ -158,6 +159,7 @@ public class NotificationService {
 							"Previous Status: %s\n" +
 							"New Status: %s\n" +
 							"Assigned User: %s\n" +
+							"Assigned UserName: %s\n" +
 							"Deadline: %s",
 					task.getId(),
 					task.getName(),
@@ -165,6 +167,7 @@ public class NotificationService {
 					task.getStatus(),
 					status,
 					task.getAssignedUserId(),
+					task.getAssignedUserName(),
 					task.getDeadline());
 
 			PublishRequest publishRequest = PublishRequest.builder()
@@ -183,7 +186,7 @@ public class NotificationService {
 
 
 
-	public void notifyNewAssignee(Task task, String newAssignee, String snsTopicArn) {
+	public void notifyNewAssignee(Task task, String newAssignee,String newAssigneeUserName, String snsTopicArn) {
 		try {
 			log.info("Starting notification process for new assignee: {} and task: {}", newAssignee, task.getId());
 
@@ -214,14 +217,16 @@ public class NotificationService {
 							"Description: %s\n" +
 							"Current Status: %s\n" +
 							"Deadline: %s\n" +
-							"Previous Assignee: %s",
+							"Previous AssigneeId: %s"+
+							"Previous AssigneeUserName: %s",
 					newAssignee,
 					task.getId(),
 					task.getName(),
 					task.getDescription(),
 					task.getStatus(),
 					task.getDeadline(),
-					task.getAssignedUserId());
+					task.getAssignedUserId(),
+					task.getAssignedUserName());
 
 			PublishRequest publishRequest = PublishRequest.builder()
 					.topicArn(snsTopicArn)

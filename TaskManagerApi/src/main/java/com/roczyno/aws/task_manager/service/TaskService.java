@@ -70,6 +70,7 @@ public class TaskService {
 			taskItem.put("assignedUserId", AttributeValue.builder().s(request.getAssignedUserId()).build());
 			taskItem.put("createdAt", AttributeValue.builder().s(LocalDateTime.now().toString()).build());
 			taskItem.put("userComment", AttributeValue.builder().s("").build());
+			taskItem.put("assignedUserName", AttributeValue.builder().s(request.getAssignedUserName()).build());
 			logger.info("Task item prepared: {}", taskItem);
 
 			logger.info("Inserting task into DynamoDB table: {}", tableName);
@@ -103,17 +104,19 @@ public class TaskService {
 			UpdateItemRequest updateRequest = UpdateItemRequest.builder()
 					.tableName(tableName)
 					.key(Map.of("id", AttributeValue.builder().s(taskId).build()))
-					.updateExpression("SET #status = :newStatus, #comment = :newComment, #updateTime = :updateTime")
+					.updateExpression("SET #status = :newStatus, #comment = :newComment, #updateTime = :updateTime, #completedAt = :completedAt")
 					.conditionExpression("attribute_exists(id) AND (#status <> :newStatus)")
 					.expressionAttributeNames(Map.of(
 							"#status", "status",
 							"#comment", "userComment",
-							"#updateTime", "lastUpdatedAt"
+							"#updateTime", "lastUpdatedAt",
+							"#completedAt", "completedAt"
 					))
 					.expressionAttributeValues(Map.of(
 							":newStatus", AttributeValue.builder().s(status.toString()).build(),
 							":newComment", AttributeValue.builder().s(userComment).build(),
-							":updateTime", AttributeValue.builder().s(LocalDateTime.now().toString()).build()
+							":updateTime", AttributeValue.builder().s(LocalDateTime.now().toString()).build(),
+							":completedAt", AttributeValue.builder().s(LocalDateTime.now().toString()).build()
 					))
 					.returnValues(ReturnValue.ALL_NEW)
 					.build();
@@ -134,7 +137,7 @@ public class TaskService {
 		}
 	}
 
-	public void reassignTask(String taskId, String newAssignee, String tableName, String snsTopicArn) {
+	public void reassignTask(String taskId, String newAssignee,String newAssigneeUserName, String tableName, String snsTopicArn) {
 		try {
 			logger.info("Starting task reassignment process");
 			logger.info("Parameters - Task ID: {}, New Assignee: {}, Table: {}", taskId, newAssignee, tableName);
@@ -168,10 +171,11 @@ public class TaskService {
 				UpdateItemResponse updateResponse = dynamoDbClient.updateItem(UpdateItemRequest.builder()
 						.tableName(tableName)
 						.key(Map.of("id", AttributeValue.builder().s(taskId).build()))
-						.updateExpression("SET assignedUserId = :newAssignee")
+						.updateExpression("SET assignedUserId = :newAssignee, assignedUserName = :newAssigneeUserName")
 						.conditionExpression("attribute_exists(id)")
 						.expressionAttributeValues(Map.of(
-								":newAssignee", AttributeValue.builder().s(newAssignee).build()
+								":newAssignee", AttributeValue.builder().s(newAssignee).build(),
+								":newAssigneeUserName", AttributeValue.builder().s(newAssigneeUserName).build()
 						))
 						.returnValues(ReturnValue.ALL_NEW)
 						.build());
@@ -184,7 +188,7 @@ public class TaskService {
 					// Send notification with full task details
 					try {
 						logger.info("Sending notification to new assignee: {}", newAssignee);
-						notificationService.notifyNewAssignee(updatedTask, newAssignee, snsTopicArn);
+						notificationService.notifyNewAssignee(updatedTask, newAssignee,newAssigneeUserName, snsTopicArn);
 						logger.info("Notification sent successfully");
 					} catch (Exception e) {
 						logger.error("Failed to send notification to new assignee");
@@ -476,10 +480,15 @@ public class TaskService {
 				.description(item.getOrDefault("description",
 						AttributeValue.builder().s("").build()).s())
 				.assignedUserId(item.get("assignedUserId").s())
+				.assignedUserName(item.get("assignedUserName").s())
 				.deadline(LocalDateTime.parse(item.get("deadline").s()))
 				.status(Status.valueOf(item.get("status").s()))
 				.userComment(item.getOrDefault("userComment",
 						AttributeValue.builder().s("").build()).s())
+				.completedAt(item.get("completedAt") != null &&
+						!item.get("completedAt").s().isEmpty() ?
+						LocalDateTime.parse(item.get("completedAt").s()) :
+						null)
 				.build();
 	}
 
