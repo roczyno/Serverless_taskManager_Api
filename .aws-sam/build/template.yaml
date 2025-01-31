@@ -420,6 +420,12 @@ Resources:
     Properties:
       QueueName:
         Fn::Sub: TasksQueue-${Stage}
+      RedrivePolicy:
+        deadLetterTargetArn:
+          Fn::GetAtt:
+          - NotificationsDLQ
+          - Arn
+        maxReceiveCount: 3
   ExpiredTasksQueue:
     Type: AWS::SQS::Queue
     Properties:
@@ -439,6 +445,11 @@ Resources:
       QueueName:
         Fn::Sub: ExpiredTasksDLQ-${Stage}
       MessageRetentionPeriod: 1209600
+  NotificationsDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName:
+        Fn::Sub: NotificationsDLQ-${Stage}
   TasksTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -538,6 +549,51 @@ Resources:
               Authorizer: CognitoAuthorizer
     Metadata:
       SamResourceId: CreateTaskFunction
+  TaskNotificationHandler:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: TaskNotificationHandler
+      Handler: com.roczyno.aws.task_manager.TaskNotificationHandler::handleRequest
+      Environment:
+        Variables:
+          ASSIGNMENT_TOPIC_ARN:
+            Ref: TasksAssignmentNotificationTopic
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - sns:Publish
+          Resource:
+            Ref: TasksAssignmentNotificationTopic
+        - Effect: Allow
+          Action:
+          - sqs:ReceiveMessage
+          - sqs:DeleteMessage
+          - sqs:GetQueueAttributes
+          Resource:
+            Fn::GetAtt:
+            - TasksQueue
+            - Arn
+        - Effect: Allow
+          Action:
+          - logs:CreateLogGroup
+          - logs:CreateLogStream
+          - logs:PutLogEvents
+          Resource:
+          - Fn::Sub: arn:aws:logs:eu-west-1:${AWS::AccountId}:log-group:/aws/lambda/*
+      Events:
+        SQSEvent:
+          Type: SQS
+          Properties:
+            Queue:
+              Fn::GetAtt:
+              - TasksQueue
+              - Arn
+            BatchSize: 10
+            MaximumBatchingWindowInSeconds: 30
+    Metadata:
+      SamResourceId: TaskNotificationHandler
   UpdateTaskStatusFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -931,6 +987,72 @@ Resources:
       - Name: FunctionName
         Value:
           Ref: DeadlineCheckerFunction
+  TaskExpirationHandler:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: TaskExpirationHandler
+      Handler: com.roczyno.aws.task_manager.TaskExpirationHandler::handleRequest
+      Environment:
+        Variables:
+          STAGE:
+            Ref: Stage
+          TASKS_TABLE_NAME:
+            Ref: TasksTable
+          TASK_DEADLINE_STATE_MACHINE_ARN:
+            Fn::GetAtt:
+            - TaskDeadlineStateMachine
+            - Arn
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - dynamodb:GetItem
+          - dynamodb:UpdateItem
+          Resource:
+          - Fn::GetAtt:
+            - TasksTable
+            - Arn
+          - Fn::Sub: ${TasksTable.Arn}/index/*
+        - Effect: Allow
+          Action:
+          - states:StartExecution
+          Resource:
+            Fn::GetAtt:
+            - TaskDeadlineStateMachine
+            - Arn
+        - Effect: Allow
+          Action:
+          - sns:Publish
+          Resource: '*'
+        - Effect: Allow
+          Action:
+          - sqs:ReceiveMessage
+          - sqs:DeleteMessage
+          - sqs:GetQueueAttributes
+          Resource:
+            Fn::GetAtt:
+            - ExpiredTasksQueue
+            - Arn
+        - Effect: Allow
+          Action:
+          - logs:CreateLogGroup
+          - logs:CreateLogStream
+          - logs:PutLogEvents
+          Resource:
+          - Fn::Sub: arn:aws:logs:eu-west-1:${AWS::AccountId}:log-group:/aws/lambda/*
+      Events:
+        ProcessExpiredTasks:
+          Type: SQS
+          Properties:
+            Queue:
+              Fn::GetAtt:
+              - ExpiredTasksQueue
+              - Arn
+            BatchSize: 10
+            MaximumBatchingWindowInSeconds: 30
+    Metadata:
+      SamResourceId: TaskExpirationHandler
 Outputs:
   UserPoolId:
     Description: ID of the Cognito User Pool

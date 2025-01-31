@@ -9,6 +9,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.roczyno.aws.task_manager.config.AwsConfig;
 import com.roczyno.aws.task_manager.service.NotificationService;
+import com.roczyno.aws.task_manager.service.QueueService;
 import com.roczyno.aws.task_manager.service.TaskService;
 import com.roczyno.aws.task_manager.util.AuthorizationUtil;
 import software.amazon.awssdk.awscore.exception.AwsServiceException;
@@ -46,11 +47,10 @@ public class ReassignTaskHandler implements RequestHandler<APIGatewayProxyReques
 				throw new IllegalStateException("ASSIGNMENT_TOPIC_ARN environment variable is not set or empty");
 			}
 
-			NotificationService notificationService = new NotificationService(
-					AwsConfig.sqsClient(),
-					AwsConfig.snsClient()
-			);
-			this.taskService = new TaskService(AwsConfig.dynamoDbClient(), notificationService,AwsConfig.objectMapper(),AwsConfig.sfnClient());
+			NotificationService notificationService = new NotificationService(AwsConfig.snsClient());
+			QueueService queueService=new QueueService(AwsConfig.sqsClient());
+			this.taskService = new TaskService(AwsConfig.dynamoDbClient(), notificationService,queueService,
+					AwsConfig.objectMapper(),AwsConfig.sfnClient());
 
 		} catch (Exception e) {
 			String errorMessage = "Failed to initialize ReassignTaskHandler: " + e.getMessage();

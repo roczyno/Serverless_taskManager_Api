@@ -10,7 +10,6 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.roczyno.aws.task_manager.config.AwsConfig;
 import com.roczyno.aws.task_manager.service.CognitoUserService;
-import com.roczyno.aws.task_manager.service.NotificationService;
 import software.amazon.awssdk.awscore.exception.AwsServiceException;
 
 import java.util.HashMap;
@@ -22,14 +21,8 @@ public class GetAllUsersHandler implements RequestHandler<APIGatewayProxyRequest
 
 
 	public GetAllUsersHandler() {
-		NotificationService notificationService = new NotificationService(
-				AwsConfig.sqsClient(),
-				AwsConfig.snsClient()
 
-		);
-		this.cognitoUserService=new CognitoUserService(System.getenv("AWS_REGION"),
-				AwsConfig.cognitoIdentityProviderClient()
-				,notificationService);
+		this.cognitoUserService=new CognitoUserService(System.getenv("AWS_REGION"),AwsConfig.cognitoIdentityProviderClient());
 		this.userPoolId = System.getenv("USER_POOL_ID");
 	}
 

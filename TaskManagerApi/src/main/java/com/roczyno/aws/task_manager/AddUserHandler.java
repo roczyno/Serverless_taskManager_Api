@@ -13,7 +13,6 @@ import com.roczyno.aws.task_manager.config.AwsConfig;
 import com.roczyno.aws.task_manager.model.Role;
 import com.roczyno.aws.task_manager.model.User;
 import com.roczyno.aws.task_manager.service.CognitoUserService;
-import com.roczyno.aws.task_manager.service.NotificationService;
 import com.roczyno.aws.task_manager.util.AuthorizationUtil;
 import software.amazon.awssdk.awscore.exception.AwsServiceException;
 
@@ -31,18 +30,7 @@ public class AddUserHandler implements RequestHandler<APIGatewayProxyRequestEven
 
 
 	public AddUserHandler() {
-
-		NotificationService notificationService = new NotificationService(
-				AwsConfig.sqsClient(),
-				AwsConfig.snsClient()
-
-		);
-
-		this.cognitoUserService = new CognitoUserService(
-				System.getenv("AWS_REGION"),
-				AwsConfig.cognitoIdentityProviderClient(),
-				notificationService
-		);
+		this.cognitoUserService = new CognitoUserService(System.getenv("AWS_REGION"),AwsConfig.cognitoIdentityProviderClient());
 		this.userPoolId = System.getenv("TM_COGNITO_USER_POOL_ID");
 	}
 	@Override

@@ -84,3 +84,9 @@ UTaskManagerApi/src/main/java/com/roczyno/aws/task_manager/util/AuthorizationUti
 PTaskManagerApi/src/main/java/com/roczyno/aws/task_manager/ReopenTaskHandler.java,3\5\35111900c730bf55a5035b19881dc457cc6af683
 ‹
 [TaskManagerApi/src/main/java/com/roczyno/aws/task_manager/model/LocalDateTimeConverter.java,9\3\9353dc5d421b7fc11022f5232df6ccfc04e1c133
+†
+VTaskManagerApi/src/main/java/com/roczyno/aws/task_manager/TaskNotificationHandler.java,2\0\2012878816705ff3ab8ee83c254a096766a555ad
+„
+TTaskManagerApi/src/main/java/com/roczyno/aws/task_manager/TaskExpirationHandler.java,1\1\11f14431695c99080c37934b62ae7b73e8f637d0
+ƒ
+STaskManagerApi/src/main/java/com/roczyno/aws/task_manager/service/QueueService.java,c\3\c3fe36bec6bdb3a74801971c97ba1a1ad496b2fa

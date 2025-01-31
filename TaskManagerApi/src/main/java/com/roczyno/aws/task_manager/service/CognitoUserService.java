@@ -16,8 +16,6 @@ import software.amazon.awssdk.services.cognitoidentityprovider.model.AdminSetUse
 import software.amazon.awssdk.services.cognitoidentityprovider.model.AttributeType;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.AuthFlowType;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.AuthenticationResultType;
-import software.amazon.awssdk.services.cognitoidentityprovider.model.ConfirmSignUpRequest;
-import software.amazon.awssdk.services.cognitoidentityprovider.model.ConfirmSignUpResponse;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.DeliveryMediumType;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.EmailConfigurationType;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.GetUserRequest;
@@ -26,9 +24,6 @@ import software.amazon.awssdk.services.cognitoidentityprovider.model.InitiateAut
 import software.amazon.awssdk.services.cognitoidentityprovider.model.InitiateAuthResponse;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.ListUsersRequest;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.ListUsersResponse;
-import software.amazon.awssdk.services.cognitoidentityprovider.model.MessageActionType;
-import software.amazon.awssdk.services.cognitoidentityprovider.model.SignUpRequest;
-import software.amazon.awssdk.services.cognitoidentityprovider.model.SignUpResponse;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.UpdateUserPoolRequest;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.UserType;
 import software.amazon.awssdk.services.sfn.SfnClient;
@@ -47,62 +42,15 @@ import java.util.UUID;
 
 public class CognitoUserService {
 	private final CognitoIdentityProviderClient cognitoIdentityProviderClient;
-	private final NotificationService notificationService;
 
-	public CognitoUserService(String region, CognitoIdentityProviderClient cognitoIdentityProviderClient, NotificationService notificationService){
+
+	public CognitoUserService(String region, CognitoIdentityProviderClient cognitoIdentityProviderClient){
 		this.cognitoIdentityProviderClient = cognitoIdentityProviderClient;
-		this.notificationService = notificationService;
+
 	}
 
 
-	public JsonObject createUser(JsonObject user,String appClientId,String appClientSecret){
-
-		String email=user.get("email").getAsString();
-		String password=user.get("password").getAsString();
-		String firstName=user.get("firstName").getAsString();
-		String lastName=user.get("lastName").getAsString();
-		String userId= UUID.randomUUID().toString();
-
-		AttributeType attributeUserId=AttributeType.builder()
-				.name("custom:userId")
-				.value(userId)
-				.build();
-		AttributeType emailAttribute=AttributeType.builder()
-				.name("email")
-				.value(email)
-				.build();
-		AttributeType nameAttribute=AttributeType.builder()
-				.name("name")
-				.value(firstName+" "+lastName)
-				.build();
-
-		List<AttributeType> attributes=new ArrayList<>();
-		attributes.add(nameAttribute);
-		attributes.add(emailAttribute);
-		attributes.add(attributeUserId);
-
-
-
-		String generateSecretHash=calculateSecretHash(appClientId,appClientSecret,email);
-		SignUpRequest signUpRequest= SignUpRequest.builder()
-				.username(email)
-				.password(password)
-				.userAttributes(attributes)
-				.clientId(appClientId)
-				.secretHash(generateSecretHash)
-				.build();
-
-		SignUpResponse signUpResponse=cognitoIdentityProviderClient.signUp(signUpRequest);
-		JsonObject createUserResult= new JsonObject();
-		createUserResult.addProperty("isSuccessful",signUpResponse.sdkHttpResponse().isSuccessful());
-		createUserResult.addProperty("statusCode",signUpResponse.sdkHttpResponse().statusCode());
-		createUserResult.addProperty("cognitoUserId",signUpResponse.userSub());
-		createUserResult.addProperty("isConfirmed",signUpResponse.userConfirmed());
-
-		return createUserResult;
-	}
-
-	public static String calculateSecretHash(String userPoolClientId, String userPoolClientSecret, String userName) {
+	private static String calculateSecretHash(String userPoolClientId, String userPoolClientSecret, String userName) {
 		final String HMAC_SHA256_ALGORITHM = "HmacSHA256";
 
 		SecretKeySpec signingKey = new SecretKeySpec(
@@ -119,21 +67,7 @@ public class CognitoUserService {
 		}
 	}
 
-	public JsonObject confirmUserSignUp(String appClientId,String appClientSecret,String email,String confirmationCode){
-		String generateSecretHash=calculateSecretHash(appClientId,appClientSecret,email);
-	ConfirmSignUpRequest confirmSignUpRequest=ConfirmSignUpRequest.builder()
-				.secretHash(generateSecretHash)
-				.username(email)
-				.confirmationCode(confirmationCode)
-				.clientId(appClientId)
-				.build();
 
-	ConfirmSignUpResponse confirmSignUpResponse=cognitoIdentityProviderClient.confirmSignUp(confirmSignUpRequest);
-	JsonObject confirmUserResponse=new JsonObject();
-	confirmUserResponse.addProperty("isSuccessful",confirmSignUpResponse.sdkHttpResponse().isSuccessful());
-	confirmUserResponse.addProperty("statusCode",confirmSignUpResponse.sdkHttpResponse().statusCode());
-	return confirmUserResponse;
-	}
 
 
 
@@ -163,19 +97,19 @@ public class CognitoUserService {
 		loginUserResponse.addProperty("accessToken", authenticationResultType.accessToken());
 		loginUserResponse.addProperty("refreshToken", authenticationResultType.refreshToken());
 
-		// Get user details using the access token
+
 		GetUserRequest getUserRequest = GetUserRequest.builder()
 				.accessToken(authenticationResultType.accessToken())
 				.build();
 		GetUserResponse getUserResponse = cognitoIdentityProviderClient.getUser(getUserRequest);
 
-		// Create user details object
+
 		JsonObject userDetails = new JsonObject();
 		getUserResponse.userAttributes().forEach(attribute -> {
 			userDetails.addProperty(attribute.name(), attribute.value());
 		});
 
-		// Add user details to response
+
 		loginUserResponse.add("user", userDetails);
 
 		return loginUserResponse;
@@ -194,22 +128,7 @@ public class CognitoUserService {
 
 	}
 
-	public JsonObject getUser(String accessToken){
-		GetUserRequest getUserRequest=GetUserRequest.builder()
-				.accessToken(accessToken)
-				.build();
-		GetUserResponse getUserResponse= cognitoIdentityProviderClient.getUser(getUserRequest);
-		JsonObject getUserResult=new JsonObject();
-		getUserResult.addProperty("isSuccessful",getUserResponse.sdkHttpResponse().isSuccessful());
-		getUserResult.addProperty("statusCode",getUserResponse.sdkHttpResponse().statusCode());
-		List<AttributeType> userAttributes= getUserResponse.userAttributes();
-		JsonObject userDetails=new JsonObject();
-		userAttributes.stream().forEach((u)->{
-			userDetails.addProperty(u.name(),u.value());
-		});
-		getUserResult.add("user",userDetails);
-		return getUserResult;
-	}
+
 
 	public JsonObject adminAddUser(User user, String userPoolId){
 
@@ -274,23 +193,23 @@ public class CognitoUserService {
 		addUserToGroup(String.valueOf(role),email,userPoolId);
 
 		try {
-			// Create input for Step Function with proper structure
+
 			ObjectMapper objectMapper = new ObjectMapper();
 			ObjectNode stepFunctionInput = objectMapper.createObjectNode();
 
-			// Add core fields
+
 			stepFunctionInput.put("email", email);
 			stepFunctionInput.put("role", role.toString());
 			stepFunctionInput.put("userId",userId);
 
-			// Add topic ARNs
+
 			String assignmentTopicArn = System.getenv("ASSIGNMENT_TOPIC_ARN");
 			String deadlineTopicArn = System.getenv("DEADLINE_TOPIC_ARN");
 			String closedTopicArn = System.getenv("CLOSED_TOPIC_ARN");
 			String reopenedTopicArn = System.getenv("REOPENED_TOPIC_ARN");
 			String completeTopicArn = System.getenv("COMPLETE_TOPIC_ARN");
 
-			// Verify all ARNs are present
+
 			if (assignmentTopicArn == null || deadlineTopicArn == null ||
 					closedTopicArn == null || reopenedTopicArn == null ||
 					completeTopicArn == null) {
@@ -303,17 +222,14 @@ public class CognitoUserService {
 			stepFunctionInput.put("reopenedTopicArn", reopenedTopicArn);
 			stepFunctionInput.put("completeTopicArn", completeTopicArn);
 
-			// Log the input for debugging
-			System.out.println("Step Function Input: " + stepFunctionInput.toString());
 
-			// Create Step Functions client
+
+
 			SfnClient stepFunctionsClient = SfnClient.builder()
 					.region(Region.of(System.getenv("AWS_REGION")))
 					.build();
 
-			String stepFunctionInputJson = stepFunctionInput.toString();
-			System.out.println("Debug - Step Function Input JSON: " + stepFunctionInputJson);
-			// Start execution with proper JSON string
+
 			StartExecutionRequest executionRequest = StartExecutionRequest.builder()
 					.stateMachineArn(System.getenv("USER_ONBOARDING_STATE_MACHINE_ARN"))
 					.input(stepFunctionInput.toString())
@@ -353,29 +269,29 @@ public class CognitoUserService {
 
 	public JsonObject getAllUsers(String userPoolId) {
 		try {
-			// Create request to list users
+
 			ListUsersRequest listUsersRequest = ListUsersRequest.builder()
 					.userPoolId(userPoolId)
 					.build();
 
-			// Get response from Cognito
+
 			ListUsersResponse listUsersResponse = cognitoIdentityProviderClient.listUsers(listUsersRequest);
 
-			// Create response object
+
 			JsonObject getAllUsersResult = new JsonObject();
 			JsonArray users = new JsonArray();
 
-			// Process each user
+
 			for (UserType user : listUsersResponse.users()) {
 				JsonObject userDetails = new JsonObject();
 
-				// Add basic user properties
+
 				userDetails.addProperty("username", user.username());
 				userDetails.addProperty("enabled", user.enabled());
 				userDetails.addProperty("userStatus", user.userStatusAsString());
 				userDetails.addProperty("userCreateDate", user.userCreateDate().toString());
 
-				// Process user attributes
+
 				JsonObject attributes = new JsonObject();
 				String userRole = null;
 				String name = null;
@@ -383,13 +299,13 @@ public class CognitoUserService {
 				for (AttributeType attribute : user.attributes()) {
 					attributes.addProperty(attribute.name(), attribute.value());
 
-					// Extract role from custom attribute
+
 					if (attribute.name().equals("custom:role")) {
 						userRole = attribute.value();
 						userDetails.addProperty("role", userRole);
 					}
 
-					// Extract name attribute
+
 					if (attribute.name().equals("name")) {
 						name = attribute.value();
 						userDetails.addProperty("name", name);
@@ -398,12 +314,12 @@ public class CognitoUserService {
 
 				userDetails.add("attributes", attributes);
 
-				// If role wasn't found in custom attributes, set as null or default
+
 				if (userRole == null) {
 					userDetails.addProperty("role", "UNDEFINED");
 				}
 
-				// If name wasn't found, set as null or empty string
+
 				if (name == null) {
 					userDetails.addProperty("name", "");
 				}
@@ -411,7 +327,7 @@ public class CognitoUserService {
 				users.add(userDetails);
 			}
 
-			// Add users array to result
+
 			getAllUsersResult.add("users", users);
 			getAllUsersResult.addProperty("isSuccessful", listUsersResponse.sdkHttpResponse().isSuccessful());
 			getAllUsersResult.addProperty("statusCode", listUsersResponse.sdkHttpResponse().statusCode());

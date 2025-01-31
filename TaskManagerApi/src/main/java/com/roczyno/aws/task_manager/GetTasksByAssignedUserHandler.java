@@ -11,6 +11,7 @@ import com.roczyno.aws.task_manager.config.AwsConfig;
 import com.roczyno.aws.task_manager.model.LocalDateTimeAdapter;
 import com.roczyno.aws.task_manager.model.Task;
 import com.roczyno.aws.task_manager.service.NotificationService;
+import com.roczyno.aws.task_manager.service.QueueService;
 import com.roczyno.aws.task_manager.service.TaskService;
 import software.amazon.awssdk.awscore.exception.AwsServiceException;
 
@@ -33,10 +34,9 @@ public class GetTasksByAssignedUserHandler implements RequestHandler<APIGatewayP
 	);
 
 	public GetTasksByAssignedUserHandler() {
-		this.taskService = new TaskService(AwsConfig.dynamoDbClient(), new NotificationService(
-				AwsConfig.sqsClient(),
-				AwsConfig.snsClient()
-		),AwsConfig.objectMapper(),AwsConfig.sfnClient());
+		QueueService queueService=new QueueService(AwsConfig.sqsClient());
+		this.taskService = new TaskService(AwsConfig.dynamoDbClient(), new NotificationService(AwsConfig.snsClient()
+		),queueService,AwsConfig.objectMapper(),AwsConfig.sfnClient());
 		this.tableName = System.getenv("TASKS_TABLE_NAME");
 
 		if (tableName == null || tableName.isEmpty()) {

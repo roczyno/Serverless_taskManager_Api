@@ -6,6 +6,7 @@ import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.ScheduledEvent;
 import com.roczyno.aws.task_manager.config.AwsConfig;
 import com.roczyno.aws.task_manager.service.NotificationService;
+import com.roczyno.aws.task_manager.service.QueueService;
 import com.roczyno.aws.task_manager.service.TaskService;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 
@@ -73,18 +74,16 @@ public class DeadlineCheckerHandler implements RequestHandler<ScheduledEvent, Vo
 		logger.log(String.format("[InitID: %s] Initializing AWS services...", initId));
 
 		try {
-			NotificationService notificationService = new NotificationService(
-					AwsConfig.sqsClient(),
-					AwsConfig.snsClient()
-			);
+			NotificationService notificationService = new NotificationService(AwsConfig.snsClient());
 			logger.log(String.format("[InitID: %s] Successfully initialized NotificationService", initId));
 
 			DynamoDbClient dynamoDbClient = AwsConfig.dynamoDbClient();
 			logger.log(String.format("[InitID: %s] Successfully initialized DynamoDbClient", initId));
-
+			QueueService queueService=new QueueService(AwsConfig.sqsClient());
 			this.taskService = new TaskService(
 					dynamoDbClient,
 					notificationService,
+					queueService,
 					AwsConfig.objectMapper(),
 					AwsConfig.sfnClient()
 			);
@@ -124,6 +123,7 @@ public class DeadlineCheckerHandler implements RequestHandler<ScheduledEvent, Vo
 		try {
 			processApproachingDeadlines(executionId, context);
 			processExpiredTasksBatch(executionId, context);
+
 
 			logger.log(String.format("[ExecutionID: %s] Lambda execution completed successfully.\n" +
 							"Final remaining time: %dms\n" +
@@ -191,6 +191,8 @@ public class DeadlineCheckerHandler implements RequestHandler<ScheduledEvent, Vo
 			throw e;
 		}
 	}
+
+
 
 	private void validateEnvironmentVariables(LambdaLogger logger) {
 		List<String> missingVariables = new ArrayList<>();

@@ -5,13 +5,13 @@ import com.amazonaws.services.lambda.runtime.LambdaLogger;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyRequestEvent;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent;
-import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.roczyno.aws.task_manager.config.AwsConfig;
 import com.roczyno.aws.task_manager.model.Status;
 import com.roczyno.aws.task_manager.service.NotificationService;
+import com.roczyno.aws.task_manager.service.QueueService;
 import com.roczyno.aws.task_manager.service.TaskService;
 import software.amazon.awssdk.awscore.exception.AwsServiceException;
 import software.amazon.awssdk.services.dynamodb.model.ConditionalCheckFailedException;
@@ -33,11 +33,10 @@ public class UpdateTaskStatusHandler implements RequestHandler<APIGatewayProxyRe
 	);
 
 	public UpdateTaskStatusHandler() {
-		NotificationService notificationService = new NotificationService(
-				AwsConfig.sqsClient(),
-				AwsConfig.snsClient()
-		);
-		this.taskService = new TaskService(AwsConfig.dynamoDbClient(), notificationService,AwsConfig.objectMapper(),AwsConfig.sfnClient());
+		NotificationService notificationService = new NotificationService(AwsConfig.snsClient());
+		QueueService queueService=new QueueService(AwsConfig.sqsClient());
+		this.taskService = new TaskService(AwsConfig.dynamoDbClient(), notificationService,queueService,
+				AwsConfig.objectMapper(),AwsConfig.sfnClient());
 		this.snsTopicArn = System.getenv("COMPLETE_TOPIC_ARN");
 		this.tableName = System.getenv("TASKS_TABLE_NAME");
 

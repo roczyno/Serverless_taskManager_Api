@@ -11,7 +11,6 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.roczyno.aws.task_manager.config.AwsConfig;
 import com.roczyno.aws.task_manager.service.CognitoUserService;
-import com.roczyno.aws.task_manager.service.NotificationService;
 import software.amazon.awssdk.awscore.exception.AwsServiceException;
 
 import java.util.Map;
@@ -29,12 +28,7 @@ public class LoginUserHandler implements RequestHandler<APIGatewayProxyRequestEv
 	);
 
 	public LoginUserHandler(){
-		NotificationService notificationService = new NotificationService(
-				AwsConfig.sqsClient(),
-				AwsConfig.snsClient()
-
-		);
-		this.cognitoUserService=new CognitoUserService(System.getenv("AWS_REGION"),AwsConfig.cognitoIdentityProviderClient(),notificationService);
+		this.cognitoUserService=new CognitoUserService(System.getenv("AWS_REGION"),AwsConfig.cognitoIdentityProviderClient());
 		this.appClientId=System.getenv("TM_COGNITO_POOL_CLIENT_ID");
 		this.appClientSecret=System.getenv("TM_COGNITO_POOL_SECRET_ID");
 	}

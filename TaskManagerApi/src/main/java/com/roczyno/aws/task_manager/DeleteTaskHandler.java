@@ -7,6 +7,7 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyRequestEvent;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent;
 import com.roczyno.aws.task_manager.config.AwsConfig;
 import com.roczyno.aws.task_manager.service.NotificationService;
+import com.roczyno.aws.task_manager.service.QueueService;
 import com.roczyno.aws.task_manager.service.TaskService;
 import com.roczyno.aws.task_manager.util.AuthorizationUtil;
 import software.amazon.awssdk.awscore.exception.AwsServiceException;
@@ -27,11 +28,9 @@ public class DeleteTaskHandler implements RequestHandler<APIGatewayProxyRequestE
 	);
 
 	public DeleteTaskHandler() {
-		NotificationService notificationService = new NotificationService(
-				AwsConfig.sqsClient(),
-				AwsConfig.snsClient()
-		);
-		this.taskService = new TaskService(AwsConfig.dynamoDbClient(), notificationService,AwsConfig.objectMapper(),AwsConfig.sfnClient());
+		NotificationService notificationService = new NotificationService(AwsConfig.snsClient());
+		QueueService queueService=new QueueService(AwsConfig.sqsClient());
+		this.taskService = new TaskService(AwsConfig.dynamoDbClient(), notificationService,queueService,AwsConfig.objectMapper(),AwsConfig.sfnClient());
 		this.tableName = System.getenv("TASKS_TABLE_NAME");
 		this.snsTopicArn = System.getenv("ASSIGNMENT_TOPIC_ARN");
 
