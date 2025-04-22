@@ -37,23 +37,23 @@ public class SNSSubscriptionHandler implements RequestHandler<Map<String, String
 		}
 
 		try {
-			// Create the filter policy
+
 			Map<String, Object> filterPolicy = new HashMap<>();
 
-			// For admin users - no filtering, receive all notifications
+
 			if ("ADMIN".equals(role)) {
-				// Create a filter policy that matches everything
+
 				Map<String, String> matchAllCondition = new HashMap<>();
 				matchAllCondition.put("anything-but", "non-existing-value");
 				filterPolicy.put("messageType", Collections.singletonList(matchAllCondition));
 			} else {
-				// Regular user filter policy - only receive notifications for assigned tasks
+
 				filterPolicy.put("assignedUserId", Collections.singletonList(userId));
 			}
 
 			String filterPolicyJson = new ObjectMapper().writeValueAsString(filterPolicy);
 
-			// Create the subscription with filter policy
+
 			SubscribeRequest request = SubscribeRequest.builder()
 					.protocol("email")
 					.endpoint(email)

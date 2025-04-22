@@ -63,6 +63,14 @@ Resources:
           Priority: 1
       AdminCreateUserConfig:
         AllowAdminCreateUserOnly: true
+        InviteMessageTemplate:
+          EmailMessage: "Hello {username},\n\nWelcome to Hour Task Manager! Your account\
+            \ has been successfully created.\n\nHere are your login credentials:\n\
+            Email: {username}\nPassword: {####}\n\nYou can access your account at:\
+            \ https://d23mvuaqvqm16q.cloudfront.net/login\n\nIf you need any assistance\
+            \ or have questions, please don't hesitate to contact our support team.\n\
+            \nBest regards,  \nThe Hour Task Manager Team\n"
+          EmailSubject: Welcome to Hour Task Manager
       AutoVerifiedAttributes:
       - email
       EmailConfiguration:

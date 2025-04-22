@@ -17,14 +17,12 @@ import software.amazon.awssdk.services.cognitoidentityprovider.model.AttributeTy
 import software.amazon.awssdk.services.cognitoidentityprovider.model.AuthFlowType;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.AuthenticationResultType;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.DeliveryMediumType;
-import software.amazon.awssdk.services.cognitoidentityprovider.model.EmailConfigurationType;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.GetUserRequest;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.GetUserResponse;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.InitiateAuthRequest;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.InitiateAuthResponse;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.ListUsersRequest;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.ListUsersResponse;
-import software.amazon.awssdk.services.cognitoidentityprovider.model.UpdateUserPoolRequest;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.UserType;
 import software.amazon.awssdk.services.sfn.SfnClient;
 import software.amazon.awssdk.services.sfn.model.StartExecutionRequest;
@@ -66,9 +64,6 @@ public class CognitoUserService {
 			throw new RuntimeException("Error while calculating ");
 		}
 	}
-
-
-
 
 
 	public JsonObject userLogin(JsonObject loginDetails, String appClientId, String appClientSecret) {
@@ -249,18 +244,7 @@ public class CognitoUserService {
 		return addUserResponse;
 	}
 
-	public void configureCognitoEmail(String userPoolId) {
-		EmailConfigurationType emailConfig = EmailConfigurationType.builder()
-				.emailSendingAccount("COGNITO_DEFAULT")
-				.build();
 
-		UpdateUserPoolRequest updateRequest = UpdateUserPoolRequest.builder()
-				.userPoolId(userPoolId)
-				.emailConfiguration(emailConfig)
-				.build();
-
-		cognitoIdentityProviderClient.updateUserPool(updateRequest);
-	}
 
 
 	private String generateTempPassword() {

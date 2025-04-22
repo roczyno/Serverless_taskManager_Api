@@ -26,7 +26,7 @@ public class QueueService {
 			log.info("Queuing task assignment notification for task: {} to user: {}",
 					task.getName(), task.getAssignedUserId());
 
-			// Create a structured message body
+
 			Map<String, String> messageData = new HashMap<>();
 			messageData.put("taskName", task.getName());
 			messageData.put("description", task.getDescription());
@@ -36,8 +36,6 @@ public class QueueService {
 			messageData.put("notificationType", "TASK_ASSIGNMENT");
 
 			String messageBody = new ObjectMapper().writeValueAsString(messageData);
-
-
 			sendToSQS(sqsQueueUrl, messageBody, task.getAssignedUserId());
 
 		} catch (Exception e) {

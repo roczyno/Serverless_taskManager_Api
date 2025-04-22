@@ -1,1 +1,2 @@
-com\roczyno\aws\task_manager\AppTest.class
+com\roczyno\aws\task_manager\CognitoUserServiceTest.class
+com\roczyno\aws\task_manager\TaskServiceTest.class

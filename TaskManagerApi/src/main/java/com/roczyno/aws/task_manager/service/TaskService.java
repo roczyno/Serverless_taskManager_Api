@@ -81,6 +81,7 @@ public class TaskService {
 					.item(taskItem)
 					.conditionExpression("attribute_not_exists(id)")
 					.build());
+
 			logger.info("Task successfully inserted into DynamoDB with ID: {}", taskId);
 
 			logger.info("Queueing task assignment notification...");
@@ -99,7 +100,7 @@ public class TaskService {
 	public void updateTaskStatus(String taskId, Status status, String userComment, String tableName, String snsTopicArn) {
 		logger.info("Updating task {} status to {}", taskId, status);
 		try {
-			// Log parameters for debugging
+
 			logger.debug("Task ID: {}, Status: {}, User Comment: {}, Table Name: {}, SNS Topic ARN: {}",
 					taskId, status, userComment, tableName, snsTopicArn);
 
@@ -123,10 +124,10 @@ public class TaskService {
 					.returnValues(ReturnValue.ALL_NEW)
 					.build();
 
-			// Perform the update
+
 			UpdateItemResponse response = dynamoDbClient.updateItem(updateRequest);
 
-			// If update successful, send notification with task details
+
 			if (response != null && response.attributes() != null) {
 				Task task = mapToTask(response.attributes());
 				notificationService.notifyAdminOfStatusChange(task, status.toString(), snsTopicArn);

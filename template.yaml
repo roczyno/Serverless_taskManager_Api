@@ -52,6 +52,23 @@ Resources:
             Priority: 1
       AdminCreateUserConfig:
         AllowAdminCreateUserOnly: true
+        InviteMessageTemplate:
+          EmailMessage: |
+            Hello {username},
+
+            Welcome to Hour Task Manager! Your account has been successfully created.
+
+            Here are your login credentials:
+            Email: {username}
+            Password: {####}
+
+            You can access your account at: https://d23mvuaqvqm16q.cloudfront.net/login
+
+            If you need any assistance or have questions, please don't hesitate to contact our support team.
+
+            Best regards,  
+            The Hour Task Manager Team
+          EmailSubject: "Welcome to Hour Task Manager"
       AutoVerifiedAttributes:
         - email
       EmailConfiguration:
@@ -84,6 +101,8 @@ Resources:
         - email
       UsernameConfiguration:
         CaseSensitive: false
+
+
 
   TaskManagerUserPoolClient:
     Type: AWS::Cognito::UserPoolClient

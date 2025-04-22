@@ -34,7 +34,7 @@ public class DeadlineCheckerHandler implements RequestHandler<ScheduledEvent, Vo
 			Map<String, String> envVars = System.getenv();
 			logEnvironmentVariables(envVars, logger);
 
-			// Initialize configuration
+
 			this.tasksTableName = envVars.get("TASKS_TABLE_NAME");
 			this.deadlineTopicArn = envVars.get("DEADLINE_TOPIC_ARN");
 			this.stepFunctionArn = envVars.get("TASK_DEADLINE_STATE_MACHINE_ARN");

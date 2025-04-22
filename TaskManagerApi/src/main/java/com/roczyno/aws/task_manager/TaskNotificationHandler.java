@@ -21,7 +21,7 @@ public class TaskNotificationHandler implements RequestHandler<SQSEvent, Void> {
 	public Void handleRequest(SQSEvent event, Context context) {
 		for (SQSEvent.SQSMessage message : event.getRecords()) {
 			try {
-				// Parse the message body
+
 				Map<String, String> messageData = objectMapper.readValue(
 						message.getBody(),
 						new TypeReference<Map<String, String>>() {
@@ -29,7 +29,7 @@ public class TaskNotificationHandler implements RequestHandler<SQSEvent, Void> {
 				);
 
 
-				// Create SNS message attributes for filtering
+
 				Map<String, MessageAttributeValue> messageAttributes = new HashMap<>();
 				messageAttributes.put("assignedUserId", MessageAttributeValue.builder()
 						.dataType("String")
@@ -41,7 +41,7 @@ public class TaskNotificationHandler implements RequestHandler<SQSEvent, Void> {
 						.stringValue(messageData.get("notificationType"))
 						.build());
 
-				// Publish to SNS
+
 				PublishRequest publishRequest = PublishRequest.builder()
 						.topicArn(SNS_TOPIC_ARN)
 						.message(formatEmailMessage(messageData))
