@@ -9,6 +9,8 @@ The Task Manager API is a comprehensive serverless application that provides a c
 ## Architecture
 
 The application follows a serverless architecture pattern using AWS services:
+![Task Manager Diagram](./taskManager.drawio.png)
+
 
 ### Key Components:
 
